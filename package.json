@@ -2,7 +2,9 @@
   "name": "@inventra-med/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "dev": "nx dev $APP"
+  },
   "private": true,
   "dependencies": {
     "next": "~16.4.1",
