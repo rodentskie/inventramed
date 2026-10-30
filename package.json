@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "dev": "nx dev $APP"
+    "dev": "nx dev $APP",
+    "task": "nx $TASK $APP"
   },
   "private": true,
   "dependencies": {
