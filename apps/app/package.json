@@ -3,11 +3,115 @@
   "version": "0.0.1",
   "private": true,
   "nx": {
-    "sourceRoot": "apps/app/src"
+    "sourceRoot": "apps/app/src",
+    "targets": {
+      "prisma:generate": {
+        "executor": "nx:run-commands",
+        "cache": true,
+        "inputs": ["{projectRoot}/prisma/schema.prisma", "{projectRoot}/prisma.config.ts"],
+        "outputs": ["{projectRoot}/src/generated/prisma"],
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "prisma generate"
+        }
+      },
+      "prisma:migrate": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "{projectRoot}",
+          "parallel": false,
+          "command": "prisma migrate dev"
+        }
+      },
+      "prisma:migrate:create": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "prisma migrate dev --create-only"
+        }
+      },
+      "prisma:deploy": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "prisma migrate deploy"
+        }
+      },
+      "prisma:status": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "prisma migrate status"
+        }
+      },
+      "prisma:reset": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "prisma migrate reset"
+        }
+      },
+      "prisma:seed": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "prisma db seed"
+        }
+      },
+      "prisma:validate": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "prisma validate"
+        }
+      },
+      "prisma:format": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "prisma format"
+        }
+      },
+      "prisma:studio": {
+        "executor": "nx:run-commands",
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "prisma studio"
+        }
+      },
+      "build": {
+        "dependsOn": ["prisma:generate", "^build"]
+      },
+      "test": {
+        "dependsOn": ["prisma:generate", "^build"]
+      },
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "dependsOn": ["prisma:generate"],
+        "options": {
+          "cwd": "{projectRoot}",
+          "commands": [
+            "tsc -p tsconfig.json --noEmit",
+            "tsc -p tsconfig.prisma.json"
+          ]
+        }
+      }
+    }
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "dotenv": "^16.4.7",
     "next": "~16.4.1",
+    "pg": "^8.23.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "prisma": "^7.10.1",
+    "tsx": "^4.23.15"
   }
 }

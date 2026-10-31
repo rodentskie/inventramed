@@ -49,3 +49,10 @@ Thumbs.db
 out
 
 test-output
+
+# env
+.env
+.env.local
+
+# Prisma generated client
+apps/app/src/generated
