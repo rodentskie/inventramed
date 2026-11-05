@@ -63,6 +63,8 @@ Run these from the repository root.
    cp apps/app/.env.example apps/app/.env
    ```
 
+   Then set `NEXTAUTH_SECRET` in `apps/app/.env` to the output of `openssl rand -base64 32`. Login doesn't work without it.
+
 4. Generate the Prisma client, apply the migrations, and seed the system roles:
 
    ```bash

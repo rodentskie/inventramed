@@ -4,7 +4,8 @@ import { prisma } from '@/lib/prisma';
 
 /**
  * Runs `fn` in one interactive transaction with `app.actor_id` set, so the
- * audit triggers record who made the change. Every inventory write must use it.
+ * audit triggers record who made the change. Every medicine, batch and inventory
+ * write must use it.
  */
 export function withActor<T>(
   userId: string,

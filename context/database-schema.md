@@ -9,7 +9,7 @@ Areas:
 3. **Inventory movement** — transactions + per-batch entries (the only way stock changes)
 4. **Notifications** — daily expiry digest (in-app + SMS), read state, SMS outbox for the Pi worker
 5. **Settings** — single-row config
-6. **Audit** — trigger-written log of inventory movement
+6. **Audit** — trigger-written log of medicine changes and inventory movement
 
 ---
 
@@ -121,6 +121,8 @@ model User {
   roleId       String    @map("role_id") @db.Uuid
   isActive     Boolean   @default(true) @map("is_active")
   lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts") // resets to 0 on successful login
+  lastLoginAttemptAt  DateTime? @map("last_login_attempt_at") @db.Timestamptz // starts the lockout cooldown
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -541,15 +543,16 @@ Single row (`id = 1`, enforced by `CHECK`), seeded by the first migration. Notab
 
 ## Audit Trail
 
-`audit_logs` is append-only. Its triggers are attached **only to inventory movement**:
+`audit_logs` is append-only. Its triggers are attached **only to medicine changes and inventory movement**:
 
 | Table                    | Events                     | Why                                                        |
 | ------------------------ | -------------------------- | ---------------------------------------------------------- |
+| `medicines`              | INSERT / UPDATE / DELETE   | catalog changes; a soft delete is logged as `updated`      |
 | `inventory_transactions` | INSERT                     | who moved stock, why, how much                             |
 | `inventory_entries`      | INSERT                     | which batches were touched                                 |
 | `medicine_batches`       | INSERT / UPDATE / DELETE   | before/after `quantity`, plus manual edits to expiry/batch no. |
 
-`actor_id` is read from `current_setting('app.actor_id', true)`. Every inventory write path must set it at the start of its `$transaction` (step 1 of FIFO allocation above). Put this in one helper, `withActor(userId, fn)`, so no caller can forget it. Without it, `actor_id` ends up NULL.
+`actor_id` is read from `current_setting('app.actor_id', true)`. Every medicine, batch and inventory write path must set it at the start of its `$transaction` (step 1 of FIFO allocation above). Put this in one helper, `withActor(userId, fn)`, so no caller can forget it. Without it, `actor_id` ends up NULL.
 
 ---
 
@@ -644,6 +647,8 @@ CREATE TRIGGER inventory_transactions_audit AFTER INSERT ON inventory_transactio
 CREATE TRIGGER inventory_entries_audit AFTER INSERT ON inventory_entries
   FOR EACH ROW EXECUTE FUNCTION write_audit_log();
 CREATE TRIGGER medicine_batches_audit AFTER INSERT OR UPDATE OR DELETE ON medicine_batches
+  FOR EACH ROW EXECUTE FUNCTION write_audit_log();
+CREATE TRIGGER medicines_audit AFTER INSERT OR UPDATE OR DELETE ON medicines
   FOR EACH ROW EXECUTE FUNCTION write_audit_log();
 ```
 

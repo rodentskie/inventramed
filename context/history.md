@@ -7,3 +7,9 @@
   - `src/lib/`: `prisma` client (pg adapter), `withActor`, `permissions` + unit tests
   - Nx `prisma:*` targets; `build`/`test`/`typecheck` generate the client first; real `typecheck` covering `prisma/`
   - Local DB via the root `compose.yml`
+- **Authentication and Medicine API** `Nov. 5, 2026` - NextAuth login and REST routes for medicines and batches in `apps/app` ([spec](features/02-api-medicine.spec.md)).
+  - `next-auth` v4 with the Credentials provider only, 8-hour JWT sessions, and `requirePermission`, which reads role and active status from the database on every request
+  - Login attempt limit with a timed cooldown and a "try again after n minutes" response: new `users.failed_login_attempts` and `users.last_login_attempt_at` columns, plus `LOGIN_MAX_ATTEMPTS` and `LOGIN_COOLDOWN_MINUTES`
+  - `/api/medicines` CRUD with soft delete, duplicate rejection and generated `MED-` barcodes; a medicine can't be deleted until its stock is 0
+  - `/api/medicines/:id/batches` to receive stock, read and edit batches, with generated `BAT-` barcodes and computed expiry status; no batch delete
+  - New audit trigger on `medicines`, and every medicine and batch write goes through `withActor`
