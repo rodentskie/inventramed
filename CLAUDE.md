@@ -2,6 +2,7 @@
 
 Read the following to get the full context of the project:
 
+- @README.md
 - @context/project-overview.md
 - @context/ai-interaction.md
 - @context/current-feature.md
