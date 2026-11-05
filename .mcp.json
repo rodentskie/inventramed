@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-postgres-server"],
+      "env": {
+        "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/inventramed?schema=public",
+        "PG_ALLOW_WRITE": "false"
+      }
+    }
+  }
+}

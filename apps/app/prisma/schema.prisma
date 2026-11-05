@@ -75,15 +75,17 @@ model Employee {
 }
 
 model User {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  employeeId   String    @unique @map("employee_id") @db.Uuid
-  username     String    @unique
-  passwordHash String    @map("password_hash")
-  roleId       String    @map("role_id") @db.Uuid
-  isActive     Boolean   @default(true) @map("is_active")
-  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId          String    @unique @map("employee_id") @db.Uuid
+  username            String    @unique
+  passwordHash        String    @map("password_hash")
+  roleId              String    @map("role_id") @db.Uuid
+  isActive            Boolean   @default(true) @map("is_active")
+  lastLoginAt         DateTime? @map("last_login_at") @db.Timestamptz
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lastLoginAttemptAt  DateTime? @map("last_login_attempt_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   employee              Employee               @relation(fields: [employeeId], references: [id])
   role                  Role                   @relation(fields: [roleId], references: [id])
