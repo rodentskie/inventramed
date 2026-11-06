@@ -32,3 +32,8 @@
   - `GET /api/inventory/transactions` with filters and paging, and `GET /api/inventory/transactions/:id`; deleted medicines keep their history
   - Every movement takes the `lockActiveMedicine` lock in one `withActor` transaction, and one helper writes the transaction and entries, so the quantity always equals the sum of its entries
   - No migration; adds `INSUFFICIENT_STOCK`, `NO_EXPIRED_STOCK` and `BATCH_NOT_EXPIRED`, and the `RETURNED` row in `database-schema.md`
+- **Settings API** `Nov. 6, 2026` - REST routes to read and update the single `settings` row in `apps/app` ([spec](features/06-settings.spec.md)).
+  - `GET` and `PATCH /api/settings`, both requiring `settings:manage`; no create or delete, so the row stays at `id = 1`
+  - `PATCH` sets `updated_by` to the caller, uses a strict schema, and can't write `worker_last_seen_at`
+  - Zod enforces limits on every number, including the columns with no database check, plus `HH:mm` times, IANA timezones (UTC offsets are rejected) and known SMS template placeholders
+  - No migration and no audit logging; adds `jest` and `@types/jest` to `apps/app` dev dependencies
