@@ -13,3 +13,9 @@
   - `/api/medicines` CRUD with soft delete, duplicate rejection and generated `MED-` barcodes; a medicine can't be deleted until its stock is 0
   - `/api/medicines/:id/batches` to receive stock, read and edit batches, with generated `BAT-` barcodes and computed expiry status; no batch delete
   - New audit trigger on `medicines`, and every medicine and batch write goes through `withActor`
+- **Create Employee API** `Nov. 6, 2026` - REST routes to list roles and create employees with their logins in `apps/app` ([spec](features/03-employees.spec.md)).
+  - `POST /api/employees` inserts the `employees` and `users` rows in one `prisma.$transaction`, because every employee must have an account
+  - `GET /api/roles` returns role IDs for `roleId`; `roles` and `role_permissions` stay seeded and read-only
+  - Both routes use `requirePermission` and the NextAuth session cookie, and only `admin` holds the required permissions today
+  - Contact numbers must be Philippine mobile numbers (`+639XXXXXXXXX`), usernames are lowercase only, and passwords are bcrypt cost 12 hashes limited to 72 bytes
+  - No migration and no audit logging for these tables

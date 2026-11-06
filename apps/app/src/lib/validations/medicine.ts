@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { hasNoNul, optionalText, requiredText } from '@/lib/validations/common';
 
 const NAME_MAX_LENGTH = 200;
 const DETAIL_MAX_LENGTH = 100;
@@ -7,21 +8,6 @@ const NOTES_MAX_LENGTH = 500;
 const QUANTITY_MAX = 1_000_000;
 const PAGE_MAX = 1_000_000;
 const PAGE_SIZE_MAX = 100;
-
-// PostgreSQL text columns can't store NUL characters.
-const hasNoNul = (value: string) => !value.includes('\u0000');
-
-const text = (maxLength: number) =>
-  z.string().trim().max(maxLength).refine(hasNoNul, 'Contains invalid characters.');
-
-const requiredText = (maxLength: number) => text(maxLength).min(1);
-
-/** Blank values become null. An absent field stays undefined, which means "unchanged" on PATCH. */
-const optionalText = (maxLength: number) =>
-  text(maxLength)
-    .nullable()
-    .optional()
-    .transform((value) => (value === '' ? null : value));
 
 const hasAtLeastOneField = (value: Record<string, unknown>) =>
   Object.values(value).some((field) => field !== undefined);

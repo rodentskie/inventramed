@@ -9,6 +9,7 @@ export type ApiErrorCode =
   | 'MEDICINE_DUPLICATE'
   | 'MEDICINE_HAS_STOCK'
   | 'BATCH_DUPLICATE'
+  | 'EMPLOYEE_DUPLICATE'
   | 'INTERNAL_ERROR';
 
 export type ApiFieldErrors = Record<string, string[]>;
