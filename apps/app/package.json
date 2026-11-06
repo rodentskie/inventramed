@@ -126,7 +126,9 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/jest": "~30.0.0",
     "@types/pg": "^8.23.1",
+    "jest": "~30.3.0",
     "prisma": "^7.10.1",
     "tsx": "^4.23.15"
   }
