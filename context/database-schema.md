@@ -394,9 +394,9 @@ Seeded roles (`is_system = true`): `admin` → `*`, `staff` → `medicine:*`, `i
 
 ### Employees ↔ users
 
-- An **employee** is a person and a **user** is a login. Every user belongs to exactly one employee (`users.employee_id` is unique). An employee may have no login, for example a pharmacist who only receives SMS.
+- An **employee** is a person and a **user** is a login. Every user belongs to exactly one employee (`users.employee_id` is unique), and every employee must have an account. The database can't enforce that second rule, so `POST /api/employees` creates both rows in one transaction.
 - `receives_sms_alerts = true` requires `contact_number` (DB `CHECK` plus Zod).
-- `contact_number` is stored normalized to E.164 so the worker can dial it as-is.
+- `contact_number` is a Philippine mobile number in E.164 format (`+639XXXXXXXXX`), validated by Zod, so the worker can dial it as-is.
 - Login uses `users.username`, and `employees.email` is contact info only. Keeping credentials on `users` means editing a person's profile never touches auth.
 
 ---
