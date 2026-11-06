@@ -14,6 +14,7 @@ import {
   toDateString,
 } from '@/lib/expiry';
 import { prisma } from '@/lib/prisma';
+import { escapeLikePattern } from '@/lib/search';
 import type {
   CreateMedicineInput,
   MedicineListQuery,
@@ -143,10 +144,6 @@ async function assertNotDuplicate(
 }
 
 /** Escapes LIKE wildcards so `search` matches them literally. */
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, '\\$&');
-}
-
 export async function listMedicines({
   search,
   page,

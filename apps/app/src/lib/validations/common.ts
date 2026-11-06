@@ -16,3 +16,9 @@ export const blankToNull = (schema: z.ZodType<string, string>) =>
     .transform((value) => (value === '' ? null : value));
 
 export const optionalText = (maxLength: number) => blankToNull(text(maxLength));
+
+export const hasAtLeastOneField = (value: Record<string, unknown>) =>
+  Object.values(value).some((field) => field !== undefined);
+export const AT_LEAST_ONE_FIELD = 'Provide at least one field to update.';
+
+export const idSchema = z.uuid();

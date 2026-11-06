@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { hasNoNul, optionalText, requiredText } from '@/lib/validations/common';
+import {
+  AT_LEAST_ONE_FIELD,
+  hasAtLeastOneField,
+  hasNoNul,
+  idSchema,
+  optionalText,
+  requiredText,
+} from '@/lib/validations/common';
+
+export { idSchema };
 
 const NAME_MAX_LENGTH = 200;
 const DETAIL_MAX_LENGTH = 100;
@@ -8,12 +17,6 @@ const NOTES_MAX_LENGTH = 500;
 const QUANTITY_MAX = 1_000_000;
 const PAGE_MAX = 1_000_000;
 const PAGE_SIZE_MAX = 100;
-
-const hasAtLeastOneField = (value: Record<string, unknown>) =>
-  Object.values(value).some((field) => field !== undefined);
-const AT_LEAST_ONE_FIELD = 'Provide at least one field to update.';
-
-export const idSchema = z.uuid();
 
 export const medicineListQuerySchema = z.strictObject({
   search: z

@@ -1,4 +1,8 @@
-import { createEmployeeSchema } from '../../../src/lib/validations/employee';
+import {
+  createEmployeeSchema,
+  employeeListQuerySchema,
+  updateEmployeeSchema,
+} from '../../../src/lib/validations/employee';
 
 const valid = {
   firstName: 'Maria',
@@ -129,4 +133,97 @@ describe('createEmployeeSchema', () => {
   it('rejects a password with a NUL character', () => {
     expect(parse({ password: 'pass\u0000word' }).success).toBe(false);
   });
+});
+
+describe('updateEmployeeSchema', () => {
+  const parseUpdate = (value: Record<string, unknown>) =>
+    updateEmployeeSchema.safeParse(value);
+
+  it('rejects an empty body', () => {
+    expect(parseUpdate({}).success).toBe(false);
+  });
+
+  it('accepts a single field and leaves the rest undefined', () => {
+    const result = updateEmployeeSchema.parse({ position: ' Pharmacist ' });
+
+    expect(result.position).toBe('Pharmacist');
+    expect(result.firstName).toBeUndefined();
+    expect(result.email).toBeUndefined();
+  });
+
+  it('has no default for receivesSmsAlerts', () => {
+    expect(
+      updateEmployeeSchema.parse({ position: 'x' }).receivesSmsAlerts,
+    ).toBeUndefined();
+  });
+
+  it.each([
+    ['password', 'a-strong-password'],
+    ['passwordHash', 'x'],
+    ['employeeId', 'x'],
+    ['failedLoginAttempts', 0],
+    ['deletedAt', null],
+  ])('rejects the unknown field %s', (field, value) => {
+    expect(parseUpdate({ [field]: value }).success).toBe(false);
+  });
+
+  it.each(['firstName', 'lastName', 'username', 'roleId', 'isActive', 'receivesSmsAlerts'])(
+    'rejects null for %s',
+    (field) => {
+      expect(parseUpdate({ [field]: null }).success).toBe(false);
+    },
+  );
+
+  it.each(['middleName', 'email', 'contactNumber', 'position'])(
+    'allows clearing %s',
+    (field) => {
+      expect(updateEmployeeSchema.parse({ [field]: null })).toMatchObject({
+        [field]: null,
+      });
+    },
+  );
+
+  it('uses the same rules as create', () => {
+    expect(parseUpdate({ username: 'MReyes' }).success).toBe(false);
+    expect(parseUpdate({ contactNumber: '09171234567' }).success).toBe(false);
+    expect(parseUpdate({ email: 'nope' }).success).toBe(false);
+    expect(parseUpdate({ firstName: '  ' }).success).toBe(false);
+    expect(parseUpdate({ roleId: 'staff' }).success).toBe(false);
+  });
+
+  it('lowercases the email', () => {
+    expect(updateEmployeeSchema.parse({ email: 'A@Example.com' }).email).toBe(
+      'a@example.com',
+    );
+  });
+
+  it('rejects alerts on while clearing the number', () => {
+    const result = parseUpdate({ receivesSmsAlerts: true, contactNumber: ' ' });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path).toEqual(['contactNumber']);
+  });
+
+  it('leaves alerts on with an absent number to the data layer', () => {
+    expect(parseUpdate({ receivesSmsAlerts: true }).success).toBe(true);
+  });
+});
+
+describe('employeeListQuerySchema', () => {
+  it('applies defaults', () => {
+    expect(employeeListQuerySchema.parse({})).toEqual({ page: 1, pageSize: 20 });
+  });
+
+  it('coerces and trims', () => {
+    expect(
+      employeeListQuerySchema.parse({ search: ' maria ', page: '2', pageSize: '5' }),
+    ).toEqual({ search: 'maria', page: 2, pageSize: 5 });
+  });
+
+  it.each([{ page: '0' }, { pageSize: '101' }, { unknown: '1' }])(
+    'rejects %j',
+    (query) => {
+      expect(employeeListQuerySchema.safeParse(query).success).toBe(false);
+    },
+  );
 });

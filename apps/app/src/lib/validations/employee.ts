@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
+  AT_LEAST_ONE_FIELD,
   blankToNull,
+  hasAtLeastOneField,
   hasNoNul,
   optionalText,
   requiredText,
@@ -14,9 +16,14 @@ const CONTACT_NUMBER_MAX_LENGTH = 20;
 const PASSWORD_MIN_LENGTH = 8;
 // bcrypt ignores everything after 72 bytes.
 const PASSWORD_MAX_BYTES = 72;
+const SEARCH_MAX_LENGTH = 200;
+const PAGE_MAX = 1_000_000;
+const PAGE_SIZE_MAX = 100;
 
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,100}$/;
 const PH_MOBILE_PATTERN = /^\+639\d{9}$/;
+
+const SMS_NEEDS_CONTACT = 'A contact number is required to receive SMS alerts.';
 
 const emailFormat = z.email();
 
@@ -32,21 +39,29 @@ const contactNumber = text(CONTACT_NUMBER_MAX_LENGTH).refine(
   'Enter a Philippine mobile number with the country code, such as +639171234567.',
 );
 
+const username = z
+  .string()
+  .regex(
+    USERNAME_PATTERN,
+    'Use 3 to 100 lowercase letters, numbers, dots, underscores or hyphens.',
+  );
+
+// Rules shared by create and update, which only differ in what is required.
+const name = requiredText(NAME_MAX_LENGTH);
+const optionalFields = {
+  middleName: optionalText(NAME_MAX_LENGTH),
+  email: blankToNull(email),
+  contactNumber: blankToNull(contactNumber),
+  position: optionalText(POSITION_MAX_LENGTH),
+};
+
 export const createEmployeeSchema = z
   .strictObject({
-    firstName: requiredText(NAME_MAX_LENGTH),
-    middleName: optionalText(NAME_MAX_LENGTH),
-    lastName: requiredText(NAME_MAX_LENGTH),
-    email: blankToNull(email),
-    contactNumber: blankToNull(contactNumber),
-    position: optionalText(POSITION_MAX_LENGTH),
+    ...optionalFields,
+    firstName: name,
+    lastName: name,
     receivesSmsAlerts: z.boolean().default(false),
-    username: z
-      .string()
-      .regex(
-        USERNAME_PATTERN,
-        'Use 3 to 100 lowercase letters, numbers, dots, underscores or hyphens.',
-      ),
+    username,
     password: z
       .string()
       .min(
@@ -65,9 +80,39 @@ export const createEmployeeSchema = z
       ctx.addIssue({
         code: 'custom',
         path: ['contactNumber'],
-        message: 'A contact number is required to receive SMS alerts.',
+        message: SMS_NEEDS_CONTACT,
       });
     }
   });
 
+export const updateEmployeeSchema = z
+  .strictObject({
+    ...optionalFields,
+    firstName: name.optional(),
+    lastName: name.optional(),
+    receivesSmsAlerts: z.boolean().optional(),
+    username: username.optional(),
+    roleId: z.uuid().optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine(hasAtLeastOneField, AT_LEAST_ONE_FIELD)
+  .superRefine((value, ctx) => {
+    // An absent number may already be stored, so updateEmployee checks that case.
+    if (value.receivesSmsAlerts && value.contactNumber === null) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contactNumber'],
+        message: SMS_NEEDS_CONTACT,
+      });
+    }
+  });
+
+export const employeeListQuerySchema = z.strictObject({
+  search: text(SEARCH_MAX_LENGTH).optional(),
+  page: z.coerce.number().int().min(1).max(PAGE_MAX).default(1),
+  pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
+});
+
 export type CreateEmployeeInput = z.output<typeof createEmployeeSchema>;
+export type UpdateEmployeeInput = z.output<typeof updateEmployeeSchema>;
+export type EmployeeListQuery = z.output<typeof employeeListQuerySchema>;

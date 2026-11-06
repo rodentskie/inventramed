@@ -10,6 +10,8 @@ export type ApiErrorCode =
   | 'MEDICINE_HAS_STOCK'
   | 'BATCH_DUPLICATE'
   | 'EMPLOYEE_DUPLICATE'
+  | 'EMPLOYEE_SELF_CHANGE'
+  | 'LAST_ADMIN'
   | 'INTERNAL_ERROR';
 
 export type ApiFieldErrors = Record<string, string[]>;
