@@ -25,3 +25,10 @@
   - Delete is a soft delete with no restore, and deleted emails and usernames stay reserved
   - Turning alerts off, deactivating or deleting cancels `PENDING` SMS messages
   - Callers can't change their own role, deactivate themselves or delete themselves, and an advisory lock guards against removing the last active admin
+- **Inventory Movement API** `Nov. 6, 2026` - REST routes that move stock out of and back into batches and read the ledger in `apps/app` ([spec](features/05-inventory-movement.spec.md)).
+  - `POST /api/medicines/:id/dispense` allocates first-expired, first-out across batches and never touches expired ones
+  - `POST /api/medicines/:id/batches/:batchId/movements` records damaged, lost, returned and count-corrected stock, with the count difference worked out under lock
+  - `POST /api/medicines/:id/expired-disposal` removes the whole of every expired batch, or only those in `batchIds`
+  - `GET /api/inventory/transactions` with filters and paging, and `GET /api/inventory/transactions/:id`; deleted medicines keep their history
+  - Every movement takes the `lockActiveMedicine` lock in one `withActor` transaction, and one helper writes the transaction and entries, so the quantity always equals the sum of its entries
+  - No migration; adds `INSUFFICIENT_STOCK`, `NO_EXPIRED_STOCK` and `BATCH_NOT_EXPIRED`, and the `RETURNED` row in `database-schema.md`

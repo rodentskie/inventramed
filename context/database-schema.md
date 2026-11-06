@@ -451,6 +451,7 @@ Expired batches are excluded from `DISPENSED`. They leave stock only through an 
 | Dispense           | OUT       | `DISPENSED`        | N entries, FIFO-allocated                               |
 | Count correction   | IN / OUT  | `COUNT_ADJUSTMENT` | 1 entry on the specified batch                          |
 | Damaged / lost     | OUT       | `DAMAGED` / `LOST` | 1 entry on the specified batch                          |
+| Returned           | IN / OUT  | `RETURNED`         | 1 entry on the specified batch. `IN` is returned to stock, `OUT` is returned to supplier |
 | Expired disposal   | OUT       | `EXPIRED_DISPOSAL` | 1 entry per expired batch                               |
 
 Transactions and entries are **immutable**: they have no `updated_at` or `deleted_at`, and a trigger rejects UPDATE/DELETE. To fix a mistake, post an offsetting transaction.
