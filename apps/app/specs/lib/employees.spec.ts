@@ -58,6 +58,7 @@ describe('createEmployee', () => {
     tx.user.create.mockResolvedValue({
       id: 'user-1',
       username: 'mreyes',
+      roleId: ROLE_ID,
       isActive: true,
       createdAt: CREATED_AT,
       role: { name: 'staff' },
@@ -111,6 +112,7 @@ describe('createEmployee', () => {
       user: {
         id: 'user-1',
         username: 'mreyes',
+        roleId: ROLE_ID,
         role: 'staff',
         isActive: true,
         createdAt: '2026-11-06T02:00:00.000Z',

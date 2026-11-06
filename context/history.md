@@ -19,3 +19,9 @@
   - Both routes use `requirePermission` and the NextAuth session cookie, and only `admin` holds the required permissions today
   - Contact numbers must be Philippine mobile numbers (`+639XXXXXXXXX`), usernames are lowercase only, and passwords are bcrypt cost 12 hashes limited to 72 bytes
   - No migration and no audit logging for these tables
+- **Employee Read, Update and Delete API** `Nov. 6, 2026` - Finishes employee CRUD in `apps/app` ([spec](features/04-employees-crud.spec.md)).
+  - `GET /api/employees` with search and paging, `GET`, `PATCH` and `DELETE /api/employees/:id`, all requiring `employee:manage` and `user:manage`
+  - `PATCH` edits both tables in one transaction, and `isActive` sets both active flags; passwords can't be changed here
+  - Delete is a soft delete with no restore, and deleted emails and usernames stay reserved
+  - Turning alerts off, deactivating or deleting cancels `PENDING` SMS messages
+  - Callers can't change their own role, deactivate themselves or delete themselves, and an advisory lock guards against removing the last active admin

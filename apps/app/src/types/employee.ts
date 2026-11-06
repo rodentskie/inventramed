@@ -1,6 +1,7 @@
 export interface EmployeeUser {
   id: string;
   username: string;
+  roleId: string;
   role: string;
   isActive: boolean;
   createdAt: string;
@@ -19,4 +20,11 @@ export interface EmployeeWithUser {
   createdAt: string;
   updatedAt: string;
   user: EmployeeUser;
+}
+
+export interface EmployeeList {
+  items: EmployeeWithUser[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
