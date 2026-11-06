@@ -44,8 +44,14 @@ interface DuplicateKey {
   dosageForm: string | null;
 }
 
-async function getExpiryContext(): Promise<ExpiryContext> {
-  const settings = await prisma.setting.findUniqueOrThrow({
+/**
+ * Pass `client` when calling inside a transaction, so the read doesn't need a
+ * second connection from the pool while the transaction holds its locks.
+ */
+export async function getExpiryContext(
+  client: Tx = prisma,
+): Promise<ExpiryContext> {
+  const settings = await client.setting.findUniqueOrThrow({
     where: { id: 1 },
     select: { timezone: true, nearExpiryThresholdDays: true },
   });
@@ -70,7 +76,7 @@ function toMedicine(row: MedicineRow, totalStock: number): Medicine {
   };
 }
 
-function toBatch(row: MedicineBatchRow, context: ExpiryContext): MedicineBatch {
+export function toBatch(row: MedicineBatchRow, context: ExpiryContext): MedicineBatch {
   const expirationDate = toDateString(row.expirationDate);
   return {
     id: row.id,
@@ -97,9 +103,12 @@ async function getTotalStock(client: Tx, medicineId: string): Promise<number> {
 
 /**
  * Locks an active medicine's row until the transaction ends, so deletes, edits
- * and stock receipts on the same medicine can't overlap.
+ * and stock movements on the same medicine can't overlap.
  */
-async function lockActiveMedicine(tx: Tx, id: string): Promise<DuplicateKey> {
+export async function lockActiveMedicine(
+  tx: Tx,
+  id: string,
+): Promise<DuplicateKey> {
   const rows = await tx.$queryRaw<
     { name: string; strength: string | null; dosage_form: string | null }[]
   >`SELECT name, strength, dosage_form FROM medicines
@@ -143,7 +152,6 @@ async function assertNotDuplicate(
   }
 }
 
-/** Escapes LIKE wildcards so `search` matches them literally. */
 export async function listMedicines({
   search,
   page,
