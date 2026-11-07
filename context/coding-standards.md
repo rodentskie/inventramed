@@ -54,7 +54,7 @@
 ## Chakra UI
 
 - Run `npx @chakra-ui/cli snippet list` to list all snippet components
-- Once selected run `npx @chakra-ui/cli snippet add <name> --outdir components/ui/` where `<name>` is the snippet selected
+- Once selected run `npx @chakra-ui/cli snippet add <name> --outdir libs/components/src/ui` where `<name>` is the snippet selected and export in @libs/components/src/index.ts
 
 ## Database
 
