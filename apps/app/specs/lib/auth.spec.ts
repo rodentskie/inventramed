@@ -1,6 +1,6 @@
 /** @jest-environment node */
 import { getServerSession } from 'next-auth';
-import { requirePermission } from '../../src/lib/auth';
+import { getActiveUser, requirePermission } from '../../src/lib/auth';
 import { prisma } from '../../src/lib/prisma';
 
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
@@ -21,6 +21,53 @@ function userWith(permissions: string[], overrides = {}) {
     ...overrides,
   };
 }
+
+describe('getActiveUser', () => {
+  const activeUser = {
+    id: 'user-1',
+    username: 'admin',
+    isActive: true,
+    employee: { isActive: true, deletedAt: null },
+  };
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    sessionMock.mockResolvedValue({ user: { id: 'user-1' } });
+  });
+
+  it('returns null without a session', async () => {
+    sessionMock.mockResolvedValue(null);
+
+    await expect(getActiveUser()).resolves.toBeNull();
+    expect(findUniqueMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a missing user', null],
+    ['an inactive user', { ...activeUser, isActive: false }],
+    [
+      'an inactive employee',
+      { ...activeUser, employee: { isActive: false, deletedAt: null } },
+    ],
+    [
+      'a soft-deleted employee',
+      { ...activeUser, employee: { isActive: true, deletedAt: new Date() } },
+    ],
+  ])('returns null for %s', async (_name, user) => {
+    findUniqueMock.mockResolvedValue(user);
+
+    await expect(getActiveUser()).resolves.toBeNull();
+  });
+
+  it('returns only the id and username of an active user', async () => {
+    findUniqueMock.mockResolvedValue(activeUser);
+
+    await expect(getActiveUser()).resolves.toEqual({
+      id: 'user-1',
+      username: 'admin',
+    });
+  });
+});
 
 describe('requirePermission', () => {
   beforeEach(() => {

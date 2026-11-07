@@ -4,10 +4,47 @@ import { ApiError } from '@/lib/api-response';
 import { authOptions } from '@/lib/auth-options';
 import { hasPermission, type Permission } from '@/lib/permissions';
 import { prisma } from '@/lib/prisma';
-import type { AuthenticatedUser } from '@/types/auth';
+import type { ActiveUser, AuthenticatedUser } from '@/types/auth';
 
 function unauthenticated(): ApiError {
   return new ApiError(401, 'UNAUTHENTICATED', 'You must be logged in.');
+}
+
+interface AccountStatus {
+  isActive: boolean;
+  employee: { isActive: boolean; deletedAt: Date | null };
+}
+
+function isAccountActive(user: AccountStatus): boolean {
+  return user.isActive && user.employee.isActive && !user.employee.deletedAt;
+}
+
+/**
+ * For pages, which redirect instead of returning an API error. Reads the
+ * database, so a deactivated user with a valid session gets null.
+ */
+export async function getActiveUser(): Promise<ActiveUser | null> {
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id;
+  if (!userId) {
+    return null;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      username: true,
+      isActive: true,
+      employee: { select: { isActive: true, deletedAt: true } },
+    },
+  });
+
+  if (!user || !isAccountActive(user)) {
+    return null;
+  }
+
+  return { id: user.id, username: user.username };
 }
 
 /**
@@ -33,9 +70,7 @@ export async function requirePermission(
     },
   });
 
-  const isActive =
-    user?.isActive && user.employee.isActive && !user.employee.deletedAt;
-  if (!user || !isActive) {
+  if (!user || !isAccountActive(user)) {
     throw unauthenticated();
   }
 

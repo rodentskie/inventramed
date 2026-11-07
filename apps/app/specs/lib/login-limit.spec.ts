@@ -2,6 +2,7 @@ import {
   formatLockoutMessage,
   getLockoutMinutesRemaining,
   getLoginLimitConfig,
+  isLockoutMessage,
 } from '../../src/lib/login-limit';
 
 describe('getLoginLimitConfig', () => {
@@ -60,5 +61,21 @@ describe('formatLockoutMessage', () => {
 
   it('uses the singular for one minute', () => {
     expect(formatLockoutMessage(1)).toBe('Try again after 1 minute');
+  });
+});
+
+describe('isLockoutMessage', () => {
+  it.each([[1], [12]])('accepts the message for %i minutes', (minutes) => {
+    expect(isLockoutMessage(formatLockoutMessage(minutes))).toBe(true);
+  });
+
+  it.each([
+    [''],
+    ['CredentialsSignin'],
+    ['Try again after soon'],
+    ['Try again after 5 minutes. Visit evil.example'],
+    ['Call us. Try again after 5 minutes'],
+  ])('rejects %j', (message) => {
+    expect(isLockoutMessage(message)).toBe(false);
   });
 });

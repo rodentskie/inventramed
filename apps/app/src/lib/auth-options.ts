@@ -2,7 +2,6 @@ import 'server-only';
 import { compare } from 'bcrypt';
 import type { NextAuthOptions, User } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { z } from 'zod';
 import {
   formatLockoutMessage,
   getLockoutMinutesRemaining,
@@ -10,6 +9,7 @@ import {
   type LoginLimitConfig,
 } from '@/lib/login-limit';
 import { prisma } from '@/lib/prisma';
+import { loginSchema } from '@/lib/validations/auth';
 
 const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 
@@ -17,12 +17,6 @@ const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 // time doesn't reveal which usernames exist. Uses the same cost as real hashes.
 const DUMMY_PASSWORD_HASH =
   '$2b$12$t.keILgOHeChAY.zufmQuuM8BpFdLe6SRbFJfn0dh/ivhMpMUaoH.';
-
-// Not strict: NextAuth also passes csrfToken, callbackUrl and json.
-const credentialsSchema = z.object({
-  username: z.string().min(1).max(100),
-  password: z.string().min(1).max(200),
-});
 
 class LoginLockedError extends Error {}
 
@@ -72,7 +66,7 @@ async function attemptLogin(credentials: unknown): Promise<User | null> {
     return null;
   }
 
-  const parsed = credentialsSchema.safeParse(credentials);
+  const parsed = loginSchema.safeParse(credentials);
   if (!parsed.success) {
     return null;
   }
@@ -142,6 +136,7 @@ export const authOptions: NextAuthOptions = {
       authorize: authorizeCredentials,
     }),
   ],
+  pages: { signIn: '/login', error: '/login' },
   session: { strategy: 'jwt', maxAge: SESSION_MAX_AGE_SECONDS },
   callbacks: {
     jwt({ token, user }) {

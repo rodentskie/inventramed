@@ -55,3 +55,11 @@
   - `actor_id` has no foreign key, so actors come from one `user.findMany` over the page's distinct IDs, and `actor` is `null` for a `NULL` `actor_id`
   - `changes` is returned as stored, and there is no detail endpoint
   - No migration and no new dependencies
+- **Login UI** `Nov. 7, 2026` - Adds the first real screen in `apps/app`: a Chakra login page on top of the existing NextAuth credentials provider ([spec](features/10-login.spec.md)).
+  - `/login` submits with client `signIn`, not a Server Action, because NextAuth v4 sets the session cookie through its own route. Field errors appear inline and sign-in failures as toasts, and `?error=` from the URL is never displayed
+  - Only server text matching `isLockoutMessage` is shown, and the form blocks double submits because the server counts an attempt before checking the password
+  - `/` and `/login` share `getActiveUser()`, which reads the database, so a deactivated user with a valid session goes to `/login` with no redirect loop. Pages check this themselves rather than through `proxy.ts`
+  - `/` is a placeholder with the username and a sign-out button. Login always goes there, so no `callbackUrl` is read from the URL
+  - Dark mode is the default, with a light mode toggle. Adds the `password-input` and `toaster` snippets, with `rootProps` retyped in `password-input` to fix a TS2590 error
+  - Adds a `build` target to `libs/components`, and `typecheck` now depends on `^build`, because the app's project reference needs the lib's declarations in `dist`
+  - No migration and no new dependencies

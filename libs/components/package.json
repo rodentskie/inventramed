@@ -19,5 +19,19 @@
   "dependencies": {
     "next-themes": "^0.4.6",
     "react-icons": "^5.7.0"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "executor": "nx:run-commands",
+        "outputs": [
+          "{projectRoot}/dist"
+        ],
+        "options": {
+          "cwd": "{projectRoot}",
+          "command": "tsc --build tsconfig.lib.json"
+        }
+      }
+    }
   }
 }
