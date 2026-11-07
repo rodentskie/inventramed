@@ -103,7 +103,9 @@
         ],
         "options": {
           "cwd": "{projectRoot}",
+          "parallel": false,
           "commands": [
+            "next typegen",
             "tsc -p tsconfig.json --noEmit",
             "tsc -p tsconfig.prisma.json"
           ]

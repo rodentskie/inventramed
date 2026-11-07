@@ -65,6 +65,8 @@ Run these from the repository root.
 
    Then set `NEXTAUTH_SECRET` in `apps/app/.env` to the output of `openssl rand -base64 32`. Login doesn't work without it.
 
+   Set `WORKER_API_TOKEN` the same way, with its own value. The SMS worker API rejects every call without it.
+
 4. Generate the Prisma client, apply the migrations, and seed the system roles:
 
    ```bash
@@ -117,4 +119,4 @@ Pass extra arguments after `--`. For example, to create a migration with a name:
 TASK=prisma:migrate:create APP=app npm run task -- --name add_something
 ```
 
-`build`, `test` and `typecheck` generate the Prisma client first.
+`build`, `test` and `typecheck` generate the Prisma client first. `typecheck` also generates Next's route types, so it doesn't need a build first.
