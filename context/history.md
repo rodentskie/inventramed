@@ -37,3 +37,9 @@
   - `PATCH` sets `updated_by` to the caller, uses a strict schema, and can't write `worker_last_seen_at`
   - Zod enforces limits on every number, including the columns with no database check, plus `HH:mm` times, IANA timezones (UTC offsets are rejected) and known SMS template placeholders
   - No migration and no audit logging; adds `jest` and `@types/jest` to `apps/app` dev dependencies
+- **Daily Digest and In-App Notifications** `Nov. 7, 2026` - Generates the daily expiry digest and adds REST routes to read it in `apps/app` ([spec](features/07-notifications.spec.md)).
+  - `generateDailyNotification()` runs at the start of `GET /api/notifications` and creates at most one digest per day, in one `prisma.$transaction`, so a failure leaves no partial digest
+  - Queues one `sms_messages` row per active recipient, and cancels older `PENDING` and timed-out `SENDING` messages even on a day with no items
+  - `GET /api/notifications` with paging and `unreadCount`, `GET /api/notifications/:id`, and `POST /api/notifications/:id/read`, all requiring `notification:read`; empty digests are hidden and return `404`
+  - Read state is per user. Marking as read uses `createMany` with `skipDuplicates` instead of the spec's upsert, because Prisma's `upsert` with an empty `update` failed with `P2002` on concurrent calls
+  - No migration; updates the generation steps in `database-schema.md`

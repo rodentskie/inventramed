@@ -15,6 +15,19 @@ export function getLocalToday(timezone: string, now: Date = new Date()): string 
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+/** The current time in the given IANA timezone, as 24-hour HH:mm. */
+export function getLocalTime(timezone: string, now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hourCycle: 'h23',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(now);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value;
+  return `${get('hour')}:${get('minute')}`;
+}
+
 /** Prisma returns `@db.Date` columns as UTC midnight, so read them back in UTC. */
 export function toDateString(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -22,6 +35,10 @@ export function toDateString(date: Date): string {
 
 export function fromDateString(date: string): Date {
   return new Date(`${date}T00:00:00.000Z`);
+}
+
+export function addDays(date: string, days: number): string {
+  return toDateString(new Date(fromDateString(date).getTime() + days * MS_PER_DAY));
 }
 
 /** Negative when the date has passed. */
