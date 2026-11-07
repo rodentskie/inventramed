@@ -43,3 +43,9 @@
   - `GET /api/notifications` with paging and `unreadCount`, `GET /api/notifications/:id`, and `POST /api/notifications/:id/read`, all requiring `notification:read`; empty digests are hidden and return `404`
   - Read state is per user. Marking as read uses `createMany` with `skipDuplicates` instead of the spec's upsert, because Prisma's `upsert` with an empty `update` failed with `P2002` on concurrent calls
   - No migration; updates the generation steps in `database-schema.md`
+- **SMS Worker API** `Nov. 7, 2026` - Adds the two bearer-token endpoints the Raspberry Pi worker uses to claim queued SMS and report results in `apps/app` ([spec](features/08-sms-worker-api.spec.md)).
+  - `POST /api/worker/sms/claim` runs `generateDailyNotification()`, sets `FAILED` on timed-out messages with no attempts left, then claims up to `sms_batch_size` messages from the latest digest using a CTE with `FOR UPDATE SKIP LOCKED`. It also returns `pollIntervalSecs`
+  - `POST /api/worker/sms/:id/result` takes the `attempt` from the claim and records the result in one transaction. A repeated or late result returns `200` with `applied: false`
+  - Auth compares SHA-256 hashes of `WORKER_API_TOKEN` with `timingSafeEqual`, and rejects every call if the token isn't set
+  - Both endpoints update `worker_last_seen_at` with raw SQL, so `settings.updated_at` still describes the last admin edit. This includes calls that then fail validation
+  - No migration; adds `WORKER_API_TOKEN` to `.env.example` and updates the worker flow in `database-schema.md`

@@ -501,29 +501,45 @@ The body is rendered from `settings.sms_template`:
 PENDING ──claim──► SENDING ──result ok──────────────────► SENT
    ▲                  │
    │                  ├─result fail, attempts < max ──────► PENDING (next_attempt_at = now + retry delay)
-   │                  ├─result fail, attempts = max ──────► FAILED
-   └──claim timeout───┘   (worker died mid-send)
+   │                  ├─result fail, attempts >= max ─────► FAILED
+   │                  ├─claim timeout, attempts >= max ───► FAILED (worker keeps dying)
+   └──claim timeout───┘   attempts < max: claimed again (worker died mid-send)
 
 PENDING ──recipient opted out / superseded by a newer digest──► CANCELLED
 SENDING ──claim timed out and superseded by a newer digest────► CANCELLED
 ```
 
-Worker API (Next.js route handlers, bearer token `WORKER_API_TOKEN` from env):
+Worker API (Next.js route handlers, bearer token `WORKER_API_TOKEN` from env). Both endpoints update `settings.worker_last_seen_at` with raw SQL, so `updated_at` and `updated_by` still describe the last admin edit.
 
-1. **`POST /api/worker/sms/claim`** updates `settings.worker_last_seen_at`, runs `generateDailyNotification()`, then atomically claims up to `sms_batch_size` messages:
+1. **`POST /api/worker/sms/claim`** runs `generateDailyNotification()` and reads `settings`. If `sms_enabled` is `false`, it returns no messages and `PENDING` messages wait. Otherwise it first gives up on `SENDING` messages past the timeout that have used all their attempts, so a worker that keeps dying can't retry a message forever:
    ```sql
    UPDATE sms_messages
-      SET status = 'SENDING', claimed_at = now(), attempts = attempts + 1, updated_at = now()
-    WHERE id IN (
-      SELECT id FROM sms_messages
-       WHERE (status = 'PENDING' AND next_attempt_at <= now())
-          OR (status = 'SENDING' AND claimed_at < now() - make_interval(mins => $timeout))
-       ORDER BY created_at
-       LIMIT $batchSize
-       FOR UPDATE SKIP LOCKED)
-   RETURNING id, phone_number, body, attempts;
+      SET status = 'FAILED', last_error = 'Claim timed out', updated_at = now()
+    WHERE status = 'SENDING'
+      AND claimed_at < now() - make_interval(mins => $timeout)
+      AND attempts >= $maxAttempts;
    ```
-2. **`POST /api/worker/sms/:id/result`** takes `{ success, error?, modemResponse? }` and, in one transaction:
+   Then it atomically claims up to `sms_batch_size` messages from the latest digest, so a message requeued after a newer digest can't send a stale list. The rows are selected in a CTE, because PostgreSQL can re-run an `IN (SELECT … LIMIT n)` subquery and go past `n`:
+   ```sql
+   WITH picked AS (
+     SELECT id FROM sms_messages
+      WHERE notification_id = (SELECT id FROM notifications ORDER BY notification_date DESC LIMIT 1)
+        AND ((status = 'PENDING' AND next_attempt_at <= now())
+          OR (status = 'SENDING' AND claimed_at < now() - make_interval(mins => $timeout)))
+      ORDER BY created_at
+      LIMIT $batchSize
+      FOR UPDATE SKIP LOCKED
+   )
+   UPDATE sms_messages m
+      SET status = 'SENDING', claimed_at = now(), attempts = m.attempts + 1, updated_at = now()
+     FROM picked
+    WHERE m.id = picked.id
+   RETURNING m.id, m.phone_number, m.body, m.attempts;
+   ```
+   The response is `{ pollIntervalSecs, messages: [{ id, phoneNumber, body, attempt }] }`, so the worker also learns `worker_poll_interval_secs`.
+2. **`POST /api/worker/sms/:id/result`** takes `{ attempt, success, error?, modemResponse? }`, where `attempt` is the value from the claim, and, in one transaction:
+   - locks the message with `SELECT … FOR UPDATE`
+   - ignores the result if the message isn't `SENDING` or `attempt` doesn't match `attempts`, returning `200` with `applied: false`, so a repeated or late result can't add a duplicate `sms_attempts` row or overwrite a newer claim
    - inserts an `sms_attempts` row
    - sets status to `SENT` + `sent_at`, or back to `PENDING` with a backoff, or to `FAILED` once `attempts >= sms_max_attempts`
 
