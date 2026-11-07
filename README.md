@@ -119,4 +119,4 @@ Pass extra arguments after `--`. For example, to create a migration with a name:
 TASK=prisma:migrate:create APP=app npm run task -- --name add_something
 ```
 
-`build`, `test` and `typecheck` generate the Prisma client first.
+`build`, `test` and `typecheck` generate the Prisma client first. `typecheck` also generates Next's route types, so it doesn't need a build first.
