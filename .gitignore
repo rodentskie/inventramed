@@ -57,3 +57,6 @@ test-output
 
 # Prisma generated client
 apps/app/src/generated
+
+# playwright
+.playwright-mcp/
