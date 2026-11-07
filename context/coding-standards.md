@@ -50,6 +50,7 @@
 - Use chakra-ui components/snippets where applicable
 - No inline styles
 - Dark mode first, light mode as option
+- Use github and notion as design reference
 
 ## Chakra UI
 
