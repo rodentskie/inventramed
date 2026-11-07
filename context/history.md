@@ -49,3 +49,9 @@
   - Auth compares SHA-256 hashes of `WORKER_API_TOKEN` with `timingSafeEqual`, and rejects every call if the token isn't set
   - Both endpoints update `worker_last_seen_at` with raw SQL, so `settings.updated_at` still describes the last admin edit. This includes calls that then fail validation
   - No migration; adds `WORKER_API_TOKEN` to `.env.example` and updates the worker flow in `database-schema.md`
+- **Audit Log API** `Nov. 7, 2026` - Adds a read-only REST route to list `audit_logs` in `apps/app` ([spec](features/09-audit-logs.spec.md)).
+  - `GET /api/audit-logs` requires `audit:read`, and filters by `entityType`, `entityId`, `action`, `actorId`, `from` (inclusive) and `to` (exclusive), with paging, sorted by `createdAt` descending, then `id`
+  - `from` and `to` need an offset, so the caller sets the timezone. A `+` in the query string must be encoded as `%2B`
+  - `actor_id` has no foreign key, so actors come from one `user.findMany` over the page's distinct IDs, and `actor` is `null` for a `NULL` `actor_id`
+  - `changes` is returned as stored, and there is no detail endpoint
+  - No migration and no new dependencies
