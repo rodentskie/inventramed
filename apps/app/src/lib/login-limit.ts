@@ -45,3 +45,8 @@ export function getLockoutMinutesRemaining(
 export function formatLockoutMessage(minutes: number): string {
   return `Try again after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 }
+
+/** Matches formatLockoutMessage, so the login page shows no other server text. */
+export function isLockoutMessage(message: string): boolean {
+  return /^Try again after \d+ minutes?$/.test(message);
+}
