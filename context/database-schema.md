@@ -469,11 +469,13 @@ A batch keeps appearing in every daily digest until it is **disposed**, meaning 
 `generateDailyNotification()` is idempotent:
 
 1. Compute `today` in `settings.timezone`. If the local time is before `settings.daily_notification_time`, stop.
-2. `INSERT INTO notifications (notification_date) VALUES (today) ON CONFLICT DO NOTHING`. If no row was inserted, today's digest already exists, so stop. This unique date makes concurrent calls safe.
-3. Insert `notification_items` for every batch where `quantity > 0 AND expiration_date - today <= near_expiry_threshold_days`. Snapshot `status`, `quantity`, `expiration_date` and `days_to_expiry`, then set `expired_count` / `near_expiry_count`.
-4. If there are no items, stop. The empty row records that today ran, and the UI hides it.
-5. Cancel any older `PENDING` `sms_messages`, since today's digest supersedes them and a stale list is never sent.
-6. If `settings.sms_enabled`, insert one `sms_messages` row per active employee with `receives_sms_alerts = true`. The row snapshots `phone_number` and the rendered `body`.
+2. If today's row already exists, stop. This cheap check avoids opening a transaction on every call.
+3. Open one `prisma.$transaction` for the remaining steps, so a failure leaves no partial digest and a later call retries.
+4. `INSERT INTO notifications (notification_date) VALUES (today) ON CONFLICT DO NOTHING`. If no row was inserted, today's digest already exists, so stop. A concurrent caller waits on this unique date until the first transaction ends, which makes concurrent calls safe.
+5. Cancel `sms_messages` for earlier digests that are `PENDING`, or `SENDING` past `sms_claim_timeout_minutes`, since today's digest supersedes them and a stale list is never sent. This runs before the "no items" stop, so older retries are still cancelled once everything is disposed of.
+6. Insert `notification_items` for every batch of a non-deleted medicine where `quantity > 0 AND expiration_date - today <= near_expiry_threshold_days`. Snapshot `status`, `quantity`, `expiration_date` and `days_to_expiry`, then set `expired_count` / `near_expiry_count`.
+7. If there are no items, stop. The transaction still commits: the empty row records that today ran, and every endpoint hides it.
+8. If `settings.sms_enabled`, insert one `sms_messages` row per active, non-deleted employee with `receives_sms_alerts = true`. The row snapshots `phone_number` and the rendered `body`.
 
 It runs at the start of every worker poll and when the app loads notifications, so no separate cron is needed. The in-app digest still appears when the worker is offline.
 
@@ -503,6 +505,7 @@ PENDING ──claim──► SENDING ──result ok─────────�
    └──claim timeout───┘   (worker died mid-send)
 
 PENDING ──recipient opted out / superseded by a newer digest──► CANCELLED
+SENDING ──claim timed out and superseded by a newer digest────► CANCELLED
 ```
 
 Worker API (Next.js route handlers, bearer token `WORKER_API_TOKEN` from env):
@@ -526,7 +529,7 @@ Worker API (Next.js route handlers, bearer token `WORKER_API_TOKEN` from env):
 
 The worker reports each result **right after each send**, not in a batch, which keeps the window for duplicates small. Delivery is at-least-once: if the Pi dies after the modem sends but before it reports, the claim timeout requeues that message and it may go out twice. That is acceptable for alerts.
 
-Cancellation: when an employee turns off `receives_sms_alerts` or is deactivated, their `PENDING` messages are set to `CANCELLED`. A new day's digest also cancels any older `PENDING` messages (step 5 above).
+Cancellation: when an employee turns off `receives_sms_alerts` or is deactivated, their `PENDING` messages are set to `CANCELLED`. A new day's digest also cancels older `PENDING` messages and older `SENDING` messages past their claim timeout (step 5 above).
 
 ---
 

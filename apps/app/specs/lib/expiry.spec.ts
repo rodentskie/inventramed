@@ -1,7 +1,9 @@
 import {
+  addDays,
   fromDateString,
   getDaysToExpiry,
   getExpiryStatus,
+  getLocalTime,
   getLocalToday,
   toDateString,
 } from '../../src/lib/expiry';
@@ -51,6 +53,26 @@ describe('getLocalToday', () => {
     const now = new Date('2026-11-05T02:00:00.000Z');
 
     expect(getLocalToday('Asia/Manila', now)).toBe('2026-11-05');
+  });
+});
+
+describe('getLocalTime', () => {
+  it('returns Manila time when UTC is still on the previous day', () => {
+    const now = new Date('2026-11-04T16:30:00.000Z');
+
+    expect(getLocalTime('Asia/Manila', now)).toBe('00:30');
+  });
+
+  it('uses 24-hour time in the afternoon', () => {
+    const now = new Date('2026-11-05T07:05:00.000Z');
+
+    expect(getLocalTime('Asia/Manila', now)).toBe('15:05');
+  });
+});
+
+describe('addDays', () => {
+  it('crosses a month boundary', () => {
+    expect(addDays('2026-11-20', 30)).toBe('2026-12-20');
   });
 });
 
