@@ -1,6 +1,10 @@
 /** @jest-environment node */
 import { getServerSession } from 'next-auth';
-import { getActiveUser, requirePermission } from '../../src/lib/auth';
+import {
+  getActiveUser,
+  getCurrentUser,
+  requirePermission,
+} from '../../src/lib/auth';
 import { prisma } from '../../src/lib/prisma';
 
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
@@ -65,6 +69,61 @@ describe('getActiveUser', () => {
     await expect(getActiveUser()).resolves.toEqual({
       id: 'user-1',
       username: 'admin',
+    });
+  });
+});
+
+describe('getCurrentUser', () => {
+  const employee = {
+    firstName: 'Rodney',
+    lastName: 'Lingganay',
+    isActive: true,
+    deletedAt: null,
+  };
+  const activeUser = {
+    id: 'user-1',
+    username: 'admin',
+    isActive: true,
+    employee,
+    role: { name: 'admin', permissions: [{ permission: '*' }] },
+  };
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    sessionMock.mockResolvedValue({ user: { id: 'user-1' } });
+  });
+
+  it('returns null without a session', async () => {
+    sessionMock.mockResolvedValue(null);
+
+    await expect(getCurrentUser()).resolves.toBeNull();
+    expect(findUniqueMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a missing user', null],
+    ['an inactive user', { ...activeUser, isActive: false }],
+    ['an inactive employee', { ...activeUser, employee: { ...employee, isActive: false } }],
+    [
+      'a soft-deleted employee',
+      { ...activeUser, employee: { ...employee, deletedAt: new Date() } },
+    ],
+  ])('returns null for %s', async (_name, user) => {
+    findUniqueMock.mockResolvedValue(user);
+
+    await expect(getCurrentUser()).resolves.toBeNull();
+  });
+
+  it('returns the name, role and permissions of an active user', async () => {
+    findUniqueMock.mockResolvedValue(activeUser);
+
+    await expect(getCurrentUser()).resolves.toEqual({
+      id: 'user-1',
+      username: 'admin',
+      firstName: 'Rodney',
+      lastName: 'Lingganay',
+      roleName: 'admin',
+      permissions: ['*'],
     });
   });
 });
