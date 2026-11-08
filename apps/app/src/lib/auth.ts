@@ -1,10 +1,11 @@
 import 'server-only';
 import { getServerSession } from 'next-auth';
+import { cache } from 'react';
 import { ApiError } from '@/lib/api-response';
 import { authOptions } from '@/lib/auth-options';
 import { hasPermission, type Permission } from '@/lib/permissions';
 import { prisma } from '@/lib/prisma';
-import type { ActiveUser, AuthenticatedUser } from '@/types/auth';
+import type { ActiveUser, AuthenticatedUser, CurrentUser } from '@/types/auth';
 
 function unauthenticated(): ApiError {
   return new ApiError(401, 'UNAUTHENTICATED', 'You must be logged in.');
@@ -46,6 +47,51 @@ export async function getActiveUser(): Promise<ActiveUser | null> {
 
   return { id: user.id, username: user.username };
 }
+
+/**
+ * For pages inside the app shell. Like `getActiveUser`, but also returns the
+ * name, role and permissions. `cache` lets the layout and page share one read.
+ */
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id;
+  if (!userId) {
+    return null;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      username: true,
+      isActive: true,
+      employee: {
+        select: {
+          firstName: true,
+          lastName: true,
+          isActive: true,
+          deletedAt: true,
+        },
+      },
+      role: {
+        select: { name: true, permissions: { select: { permission: true } } },
+      },
+    },
+  });
+
+  if (!user || !isAccountActive(user)) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    username: user.username,
+    firstName: user.employee.firstName,
+    lastName: user.employee.lastName,
+    roleName: user.role.name,
+    permissions: user.role.permissions.map((p) => p.permission),
+  };
+});
 
 /**
  * Checks the session, then reads the user's status and permissions from the

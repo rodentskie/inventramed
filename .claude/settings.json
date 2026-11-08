@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "mcp__playwright__browser_run_code_unsafe",
-      "mcp__playwright__browser_close"
+      "mcp__playwright__browser_close",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_resize"
     ]
   }
 }

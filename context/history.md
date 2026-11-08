@@ -63,3 +63,11 @@
   - Dark mode is the default, with a light mode toggle. Adds the `password-input` and `toaster` snippets, with `rootProps` retyped in `password-input` to fix a TS2590 error
   - Adds a `build` target to `libs/components`, and `typecheck` now depends on `^build`, because the app's project reference needs the lib's declarations in `dist`
   - No migration and no new dependencies
+- **Dashboard and App Shell** `Nov. 8, 2026` - Replaces the `/` placeholder with a shared app shell and a dashboard in `apps/app`, using GitHub's settings page as the design reference ([spec](features/11-dashboard.spec.md)).
+  - Protected pages live in the `src/app/(app)/` route group, whose layout checks the user with the new `getCurrentUser()`. It returns the name, role and permissions, and is wrapped in React `cache()` so the layout and page share one read
+  - The shell has a header (color mode, notification bell, user menu with sign-out), a name-and-role header, and a sidebar grouped into Inventory, People and System that moves into a drawer below `lg`. Screens from later features are listed but disabled with a `Soon` tag
+  - Nav items and dashboard sections appear only with their permission. Sections: SMS worker offline warning (`settings:manage`), overview counts and "Needs attention" batches (`medicine:read`), latest digest (`notification:read`) and recent stock movement (`inventory:read`)
+  - Expiry counts use the same rules and timezone as `getExpiryStatus`; loading the dashboard or the bell also generates today's digest when it's due
+  - Adds the `avatar`, `menu`, `drawer`, `close-button`, `tooltip`, `stat`, `status`, `empty-state`, `tag` and `toggle-tip` snippets. `AvatarGroup` is removed from `avatar` to fix a TS2590 error, and `tag` no longer uses `VoidFunction`
+  - `SignOutButton.tsx` is now unused and kept until it's confirmed for deletion
+  - No migration and no new dependencies
