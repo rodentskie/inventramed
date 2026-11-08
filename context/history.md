@@ -71,3 +71,12 @@
   - Adds the `avatar`, `menu`, `drawer`, `close-button`, `tooltip`, `stat`, `status`, `empty-state`, `tag` and `toggle-tip` snippets. `AvatarGroup` is removed from `avatar` to fix a TS2590 error, and `tag` no longer uses `VoidFunction`
   - `SignOutButton.tsx` is now unused and kept until it's confirmed for deletion
   - No migration and no new dependencies
+- **Medicines Pages and Barcode Scanning** `Nov. 8, 2026` - Adds the first screens that change data in `apps/app`: the medicine list and detail pages, their forms, printable batch labels, and camera scanning ([spec](features/12-medicines.spec.md)).
+  - `/medicines` with search, paging and total stock, all in the URL. `/medicines/[id]` shows the details, the `MED-` barcode and batches in FEFO order with live expiry status. Forms in dialogs create, edit and delete medicines, receive stock and edit batches
+  - Server Actions in `src/actions/` call the existing lib functions and check their own permissions. `runAction` returns `{ success, data, error }` and rethrows Next's redirect and not-found errors. `requirePageUser` guards pages, and `parseListQuery` falls back to defaults on bad query values
+  - Scope change: the medicine forms scan the manufacturer's barcode, and `/scan` looks up `MED-`, `BAT-` or product codes from the camera or typed input. It uses `react-barcode` to render and `react-barcode-scanner` for the camera, instead of `jsbarcode` and feature 13's `@zxing/browser`
+  - Migration `add_medicine_product_barcode`: nullable, unique `medicines.product_barcode`, with a `CHECK` against the `MED-` and `BAT-` prefixes. Soft delete clears it. Adds `PRODUCT_BARCODE_DUPLICATE`, and product lookups also try the UPC-A/EAN-13 twin
+  - `/labels/batches/[batchId]` in a `(print)` route group, with no shell and always light, prints one label. The camera stays off until the user starts it, and stops after a read, on close and when leaving the page
+  - Validation messages are now written for users (`This field is required.`, `Use at most N characters.`), which also changes the wording the existing API returns
+  - Adds the `dialog`, `pagination`, `data-list` and `field` snippets, plus `link-button`, retyped to fix a declaration build error. Spec 13 is marked for revision, since `/scan` and the lookup are done
+  - Checked with Playwright, including fake-camera reads of the printed labels. The collaborator view wasn't checked in the browser, because no active collaborator account exists

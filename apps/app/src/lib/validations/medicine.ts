@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { productBarcodeSchema } from '@/lib/validations/barcode';
 import {
   AT_LEAST_ONE_FIELD,
+  blankToNull,
   hasAtLeastOneField,
   hasNoNul,
   idSchema,
@@ -17,6 +19,8 @@ const NOTES_MAX_LENGTH = 500;
 const QUANTITY_MAX = 1_000_000;
 const PAGE_MAX = 1_000_000;
 const PAGE_SIZE_MAX = 100;
+const DATE_MESSAGE = 'Enter a valid date.';
+const QUANTITY_MESSAGE = 'Enter a whole number from 1 to 1,000,000.';
 
 export const medicineListQuerySchema = z.strictObject({
   search: z
@@ -35,6 +39,7 @@ export const createMedicineSchema = z.strictObject({
   strength: optionalText(DETAIL_MAX_LENGTH),
   dosageForm: optionalText(DETAIL_MAX_LENGTH),
   unit: requiredText(UNIT_MAX_LENGTH).default('pc'),
+  productBarcode: blankToNull(productBarcodeSchema),
 });
 
 export const updateMedicineSchema = z
@@ -44,20 +49,25 @@ export const updateMedicineSchema = z
     strength: optionalText(DETAIL_MAX_LENGTH),
     dosageForm: optionalText(DETAIL_MAX_LENGTH),
     unit: requiredText(UNIT_MAX_LENGTH).optional(),
+    productBarcode: blankToNull(productBarcodeSchema),
   })
   .refine(hasAtLeastOneField, AT_LEAST_ONE_FIELD);
 
 export const receiveStockSchema = z.strictObject({
   batchNumber: requiredText(DETAIL_MAX_LENGTH),
-  expirationDate: z.iso.date(),
-  quantity: z.number().int().min(1).max(QUANTITY_MAX),
+  expirationDate: z.iso.date(DATE_MESSAGE),
+  quantity: z
+    .number(QUANTITY_MESSAGE)
+    .int(QUANTITY_MESSAGE)
+    .min(1, QUANTITY_MESSAGE)
+    .max(QUANTITY_MAX, QUANTITY_MESSAGE),
   notes: optionalText(NOTES_MAX_LENGTH),
 });
 
 export const updateBatchSchema = z
   .strictObject({
     batchNumber: requiredText(DETAIL_MAX_LENGTH).optional(),
-    expirationDate: z.iso.date().optional(),
+    expirationDate: z.iso.date(DATE_MESSAGE).optional(),
   })
   .refine(hasAtLeastOneField, AT_LEAST_ONE_FIELD);
 

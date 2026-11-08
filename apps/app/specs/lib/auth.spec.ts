@@ -1,13 +1,16 @@
 /** @jest-environment node */
+import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import {
   getActiveUser,
   getCurrentUser,
+  requirePageUser,
   requirePermission,
 } from '../../src/lib/auth';
 import { prisma } from '../../src/lib/prisma';
 
 jest.mock('next-auth', () => ({ getServerSession: jest.fn() }));
+jest.mock('next/navigation', () => ({ redirect: jest.fn() }));
 jest.mock('@/lib/auth-options', () => ({ authOptions: {} }));
 jest.mock('@/lib/prisma', () => ({
   prisma: { user: { findUnique: jest.fn() } },
@@ -190,5 +193,47 @@ describe('requirePermission', () => {
     await expect(
       requirePermission('medicine:write', 'inventory:write'),
     ).resolves.toEqual({ id: 'user-1' });
+  });
+});
+
+describe('requirePageUser', () => {
+  const activeUser = {
+    id: 'user-1',
+    username: 'mreyes',
+    isActive: true,
+    employee: { firstName: 'Maria', lastName: 'Reyes', isActive: true, deletedAt: null },
+    role: { name: 'collaborator', permissions: [{ permission: 'medicine:read' }] },
+  };
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    (redirect as unknown as jest.Mock).mockImplementation((path: string) => {
+      throw new Error(`redirect:${path}`);
+    });
+    sessionMock.mockResolvedValue({ user: { id: 'user-1' } });
+    findUniqueMock.mockResolvedValue(activeUser);
+  });
+
+  it('redirects to /login without a user', async () => {
+    sessionMock.mockResolvedValue(null);
+
+    await expect(requirePageUser('medicine:read')).rejects.toThrow('redirect:/login');
+  });
+
+  it('redirects to / without the permission', async () => {
+    await expect(requirePageUser('medicine:write')).rejects.toThrow('redirect:/');
+  });
+
+  it('returns the user with the permission', async () => {
+    await expect(requirePageUser('medicine:read')).resolves.toMatchObject({
+      id: 'user-1',
+      permissions: ['medicine:read'],
+    });
+  });
+
+  it('only needs a user without a permission', async () => {
+    findUniqueMock.mockResolvedValue({ ...activeUser, role: { name: 'x', permissions: [] } });
+
+    await expect(requirePageUser()).resolves.toMatchObject({ id: 'user-1' });
   });
 });

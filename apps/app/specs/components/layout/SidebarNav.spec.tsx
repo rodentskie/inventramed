@@ -25,10 +25,17 @@ describe('SidebarNav', () => {
   it('renders later screens as disabled entries, not links', () => {
     renderWithChakra(<SidebarNav groups={getVisibleNav(['*'])} />);
 
-    expect(screen.queryByRole('link', { name: /Medicines/ })).toBeNull();
-    const medicines = screen.getByText('Medicines').closest('[aria-disabled]');
-    expect(medicines?.textContent).toContain('Soon');
-    expect(screen.getAllByText('Soon')).toHaveLength(7);
+    expect(screen.queryByRole('link', { name: /Transactions/ })).toBeNull();
+    const transactions = screen.getByText('Transactions').closest('[aria-disabled]');
+    expect(transactions?.textContent).toContain('Soon');
+    expect(screen.getAllByText('Soon')).toHaveLength(5);
+  });
+
+  it('renders Medicines and Scan as links', () => {
+    renderWithChakra(<SidebarNav groups={getVisibleNav(['*'])} />);
+
+    expect(screen.getByRole('link', { name: 'Medicines' }).getAttribute('href')).toBe('/medicines');
+    expect(screen.getByRole('link', { name: 'Scan' }).getAttribute('href')).toBe('/scan');
   });
 
   it('shows group headings only for visible groups', () => {

@@ -8,6 +8,7 @@ export interface Medicine {
   dosageForm: string | null;
   unit: string;
   barcode: string;
+  productBarcode: string | null;
   totalStock: number;
   createdAt: string;
   updatedAt: string;
@@ -42,3 +43,16 @@ export interface ReceiveStockResult {
   batch: MedicineBatch;
   created: boolean;
 }
+
+export interface BatchLabel {
+  medicineName: string;
+  strength: string | null;
+  batchNumber: string;
+  expirationDate: string;
+  barcode: string;
+}
+
+/** What a scanned code resolved to. A batch result also carries its medicine. */
+export type ScanResult =
+  | { kind: 'medicine' | 'product'; medicine: MedicineDetail }
+  | { kind: 'batch'; batchId: string; medicine: MedicineDetail };

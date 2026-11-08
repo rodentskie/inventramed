@@ -4,9 +4,14 @@ import { z } from 'zod';
 export const hasNoNul = (value: string) => !value.includes('\u0000');
 
 export const text = (maxLength: number) =>
-  z.string().trim().max(maxLength).refine(hasNoNul, 'Contains invalid characters.');
+  z
+    .string()
+    .trim()
+    .max(maxLength, `Use at most ${maxLength} characters.`)
+    .refine(hasNoNul, 'Contains invalid characters.');
 
-export const requiredText = (maxLength: number) => text(maxLength).min(1);
+export const requiredText = (maxLength: number) =>
+  text(maxLength).min(1, 'This field is required.');
 
 /** Blank values become null. An absent field stays undefined, which means "unchanged" on PATCH. */
 export const blankToNull = (schema: z.ZodType<string, string>) =>

@@ -48,7 +48,9 @@ describe('getVisibleNav', () => {
     const items = getVisibleNav(['*']).flatMap((group) => group.items);
 
     expect(items.find((item) => item.label === 'Dashboard')?.enabled).toBe(true);
-    expect(items.find((item) => item.label === 'Medicines')?.enabled).toBe(false);
+    expect(items.find((item) => item.label === 'Medicines')?.enabled).toBe(true);
+    expect(items.find((item) => item.label === 'Scan')?.enabled).toBe(true);
+    expect(items.find((item) => item.label === 'Transactions')?.enabled).toBe(false);
   });
 });
 
