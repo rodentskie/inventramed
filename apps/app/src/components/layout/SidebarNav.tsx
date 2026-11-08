@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import type { IconType } from 'react-icons';
 import {
   LuArrowLeftRight,
+  LuBell,
   LuLayoutDashboard,
   LuPill,
   LuScanBarcode,
@@ -20,6 +21,7 @@ import type { NavGroup, NavIcon, NavItem } from '@/types/dashboard';
 /** Icons are mapped here because components can't be passed from the server. */
 const ICONS: Record<NavIcon, IconType> = {
   dashboard: LuLayoutDashboard,
+  notifications: LuBell,
   medicines: LuPill,
   transactions: LuArrowLeftRight,
   scan: LuScanBarcode,

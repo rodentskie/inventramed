@@ -77,7 +77,7 @@ describe('AppLayout', () => {
     await renderLayout();
 
     const bell = screen.getByRole('link', { name: 'Notifications, unread' });
-    expect(bell.getAttribute('href')).toBe('/#alerts');
+    expect(bell.getAttribute('href')).toBe('/notifications');
   });
 
   it('shows a plain bell when there is no unread digest', async () => {

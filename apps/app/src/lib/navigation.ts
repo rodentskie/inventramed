@@ -7,6 +7,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: null,
     items: [
       { label: 'Dashboard', href: '/', icon: 'dashboard', permissions: [], enabled: true },
+      { label: 'Notifications', href: '/notifications', icon: 'notifications', permissions: ['notification:read'], enabled: true },
     ],
   },
   {

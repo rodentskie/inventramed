@@ -21,6 +21,7 @@ describe('getVisibleNav', () => {
   it('shows staff the dashboard and the inventory group', () => {
     expect(labels(['medicine:*', 'inventory:*', 'notification:read'])).toEqual([
       'Dashboard',
+      'Notifications',
       'Medicines',
       'Transactions',
       'Scan',
@@ -30,7 +31,12 @@ describe('getVisibleNav', () => {
   it('shows a collaborator the same read-only items', () => {
     expect(
       labels(['medicine:read', 'inventory:read', 'notification:read']),
-    ).toEqual(['Dashboard', 'Medicines', 'Transactions', 'Scan']);
+    ).toEqual(['Dashboard', 'Notifications', 'Medicines', 'Transactions', 'Scan']);
+  });
+
+  it('shows notifications only with notification:read', () => {
+    expect(labels(['medicine:read'])).not.toContain('Notifications');
+    expect(labels(['notification:read'])).toEqual(['Dashboard', 'Notifications']);
   });
 
   it('removes groups left empty', () => {
