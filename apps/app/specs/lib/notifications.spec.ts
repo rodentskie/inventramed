@@ -3,8 +3,10 @@ import { ApiError } from '../../src/lib/api-response';
 import { fromDateString } from '../../src/lib/expiry';
 import {
   generateDailyNotification,
+  getCurrentBatchQuantities,
   getNotification,
   listNotifications,
+  markAllNotificationsRead,
   markNotificationRead,
 } from '../../src/lib/notifications';
 import { prisma } from '../../src/lib/prisma';
@@ -30,6 +32,7 @@ jest.mock('@/lib/prisma', () => {
         count: jest.fn(),
       },
       notificationRead: { createMany: jest.fn(), findUniqueOrThrow: jest.fn() },
+      medicineBatch: { findMany: jest.fn() },
     },
   };
 });
@@ -50,6 +53,7 @@ const mockedPrisma = prisma as unknown as {
     count: jest.Mock;
   };
   notificationRead: { createMany: jest.Mock; findUniqueOrThrow: jest.Mock };
+  medicineBatch: { findMany: jest.Mock };
 };
 const { tx } = mockedPrisma;
 const settingsMock = getSettings as jest.Mock;
@@ -357,7 +361,7 @@ describe('reads', () => {
             batch: {
               batchNumber: 'A123',
               medicineId: 'medicine-1',
-              medicine: { name: 'Paracetamol', strength: null },
+              medicine: { name: 'Paracetamol', strength: null, unit: 'pc' },
             },
           },
         ],
@@ -373,6 +377,7 @@ describe('reads', () => {
             medicineId: 'medicine-1',
             medicineName: 'Paracetamol',
             strength: null,
+            unit: 'pc',
             batchNumber: 'A123',
             status: 'EXPIRED',
             quantity: 5,
@@ -400,6 +405,50 @@ describe('reads', () => {
       expect(mockedPrisma.notification.findFirst.mock.calls[0][0].where).toEqual({
         id: NOTIFICATION_ID,
         OR: [{ expiredCount: { gt: 0 } }, { nearExpiryCount: { gt: 0 } }],
+      });
+    });
+  });
+
+  describe('markAllNotificationsRead', () => {
+    it('inserts only for non-empty digests the user has not read', async () => {
+      mockedPrisma.notification.findMany.mockResolvedValue([
+        { id: 'n-1' },
+        { id: 'n-2' },
+      ]);
+      mockedPrisma.notificationRead.createMany.mockResolvedValue({ count: 2 });
+
+      await expect(markAllNotificationsRead(USER_ID)).resolves.toEqual({ count: 2 });
+      expect(mockedPrisma.notification.findMany).toHaveBeenCalledWith({
+        where: {
+          OR: [{ expiredCount: { gt: 0 } }, { nearExpiryCount: { gt: 0 } }],
+          reads: { none: { userId: USER_ID } },
+        },
+        select: { id: true },
+      });
+      expect(mockedPrisma.notificationRead.createMany).toHaveBeenCalledWith({
+        data: [
+          { notificationId: 'n-1', userId: USER_ID },
+          { notificationId: 'n-2', userId: USER_ID },
+        ],
+        skipDuplicates: true,
+      });
+    });
+  });
+
+  describe('getCurrentBatchQuantities', () => {
+    it('maps batch IDs to their live quantities', async () => {
+      mockedPrisma.medicineBatch.findMany.mockResolvedValue([
+        { id: 'batch-1', quantity: 0 },
+        { id: 'batch-2', quantity: 12 },
+      ]);
+
+      await expect(getCurrentBatchQuantities(['batch-1', 'batch-2'])).resolves.toEqual({
+        'batch-1': 0,
+        'batch-2': 12,
+      });
+      expect(mockedPrisma.medicineBatch.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['batch-1', 'batch-2'] } },
+        select: { id: true, quantity: true },
       });
     });
   });

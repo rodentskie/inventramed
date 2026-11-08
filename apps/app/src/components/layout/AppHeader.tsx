@@ -24,7 +24,7 @@ function NotificationBell({ hasUnread }: { hasUnread: boolean }) {
       position="relative"
       aria-label={hasUnread ? 'Notifications, unread' : 'Notifications'}
     >
-      <NextLink href="/#alerts">
+      <NextLink href="/notifications">
         <LuBell />
         {hasUnread && (
           <Box

@@ -268,7 +268,7 @@ export async function getNotification(
             select: {
               batchNumber: true,
               medicineId: true,
-              medicine: { select: { name: true, strength: true } },
+              medicine: { select: { name: true, strength: true, unit: true } },
             },
           },
         },
@@ -288,6 +288,7 @@ export async function getNotification(
       medicineId: item.batch.medicineId,
       medicineName: item.batch.medicine.name,
       strength: item.batch.medicine.strength,
+      unit: item.batch.medicine.unit,
       batchNumber: item.batch.batchNumber,
       status: item.status,
       quantity: item.quantity,
@@ -323,4 +324,33 @@ export async function markNotificationRead(
   });
 
   return { id, readAt: read.readAt.toISOString() };
+}
+
+/** `skipDuplicates` keeps the first `read_at` if a digest is read during this call. */
+export async function markAllNotificationsRead(
+  userId: string,
+): Promise<{ count: number }> {
+  const unread = await prisma.notification.findMany({
+    where: { ...NON_EMPTY, reads: { none: { userId } } },
+    select: { id: true },
+  });
+
+  const { count } = await prisma.notificationRead.createMany({
+    data: unread.map(({ id }) => ({ notificationId: id, userId })),
+    skipDuplicates: true,
+  });
+
+  return { count };
+}
+
+/** Live quantities, to compare against a digest's snapshots. */
+export async function getCurrentBatchQuantities(
+  batchIds: string[],
+): Promise<Record<string, number>> {
+  const batches = await prisma.medicineBatch.findMany({
+    where: { id: { in: batchIds } },
+    select: { id: true, quantity: true },
+  });
+
+  return Object.fromEntries(batches.map(({ id, quantity }) => [id, quantity]));
 }

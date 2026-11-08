@@ -142,10 +142,15 @@ describe('LatestAlert', () => {
     expect(screen.queryByText('Unread')).toBeNull();
   });
 
-  it('is the #alerts target and has an empty state', () => {
-    const { container } = renderWithChakra(<LatestAlert digest={null} />);
+  it('links to the digest', () => {
+    renderWithChakra(<LatestAlert digest={digest} />);
 
-    expect(container.querySelector('#alerts')).not.toBeNull();
+    expect(screen.getByRole('link').getAttribute('href')).toBe(`/notifications/${digest.id}`);
+  });
+
+  it('has an empty state', () => {
+    renderWithChakra(<LatestAlert digest={null} />);
+
     expect(screen.getByText('No alerts yet')).toBeTruthy();
   });
 });

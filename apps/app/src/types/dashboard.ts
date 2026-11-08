@@ -50,6 +50,7 @@ export interface WorkerStatus {
 
 export type NavIcon =
   | 'dashboard'
+  | 'notifications'
   | 'medicines'
   | 'transactions'
   | 'scan'

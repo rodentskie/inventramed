@@ -23,6 +23,7 @@ export interface NotificationItem {
   medicineId: string;
   medicineName: string;
   strength: string | null;
+  unit: string;
   batchNumber: string;
   status: NotificationItemStatus;
   quantity: number;
