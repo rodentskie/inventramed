@@ -27,7 +27,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'System',
     items: [
-      { label: 'Settings', href: '/settings', icon: 'settings', permissions: ['settings:manage'], enabled: false },
+      { label: 'Settings', href: '/settings', icon: 'settings', permissions: ['settings:manage'], enabled: true },
       { label: 'Audit logs', href: '/audit-logs', icon: 'audit-logs', permissions: ['audit:read'], enabled: false },
     ],
   },
