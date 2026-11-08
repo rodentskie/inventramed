@@ -71,7 +71,7 @@ const cases = [
     invalid: () => receiveStockAction(ID, { batchNumber: 'P778', quantity: 0 }),
     lib: () => lib.receiveStock,
     libArgs: ['user-1', ID, { batchNumber: 'P778', expirationDate: '2027-01-31', quantity: 10 }],
-    paths: ['/medicines', `/medicines/${ID}`],
+    paths: ['/medicines', `/medicines/${ID}`, '/', '/scan'],
   },
   {
     name: 'updateBatchAction',

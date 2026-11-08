@@ -1,7 +1,7 @@
 import { Table } from '@chakra-ui/react';
 import { EmptyState, Status } from '@inventra-med/components';
 import { LuPackageOpen } from 'react-icons/lu';
-import { BatchRowMenu } from '@/components/medicines/BatchRowMenu';
+import { BatchRowMenu, type BatchMovements } from '@/components/medicines/BatchRowMenu';
 import { getLocalToday } from '@/lib/expiry';
 import { formatCount, formatDaysToExpiry } from '@/lib/format';
 import type { BatchExpiryStatus, MedicineBatch } from '@/types/medicine';
@@ -20,6 +20,8 @@ interface BatchTableProps {
   timezone: string;
   /** A scanned batch, marked so it stands out. */
   highlightId?: string;
+  /** Adds the batch movements to each row's menu. */
+  movements?: BatchMovements;
 }
 
 interface BatchRowProps {
@@ -28,9 +30,10 @@ interface BatchRowProps {
   canEdit: boolean;
   timezone: string;
   highlighted: boolean;
+  movements?: BatchMovements;
 }
 
-function BatchRow({ batch, unit, canEdit, timezone, highlighted }: BatchRowProps) {
+function BatchRow({ batch, unit, canEdit, timezone, highlighted, movements }: BatchRowProps) {
   const empty = batch.quantity === 0;
   return (
     <Table.Row
@@ -53,14 +56,21 @@ function BatchRow({ batch, unit, canEdit, timezone, highlighted }: BatchRowProps
         {formatCount(batch.quantity)} {unit}
       </Table.Cell>
       <Table.Cell textAlign="end" width="1">
-        <BatchRowMenu batch={batch} canEdit={canEdit} />
+        <BatchRowMenu batch={batch} canEdit={canEdit} movements={movements} />
       </Table.Cell>
     </Table.Row>
   );
 }
 
 /** Batches in FEFO order, as `getMedicine` returns them. Empty batches stay for their history. */
-export function BatchTable({ batches, unit, canEdit, timezone, highlightId }: BatchTableProps) {
+export function BatchTable({
+  batches,
+  unit,
+  canEdit,
+  timezone,
+  highlightId,
+  movements,
+}: BatchTableProps) {
   if (batches.length === 0) {
     return (
       <EmptyState
@@ -98,6 +108,7 @@ export function BatchTable({ batches, unit, canEdit, timezone, highlightId }: Ba
               canEdit={canEdit}
               timezone={timezone}
               highlighted={batch.id === highlightId}
+              movements={movements}
             />
           ))}
         </Table.Body>

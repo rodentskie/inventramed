@@ -1,53 +1,16 @@
 'use client';
 
-import { Box, Text } from '@chakra-ui/react';
-import { useRef, useState } from 'react';
-import { BarcodeScanner, type DetectedBarcode } from 'react-barcode-scanner';
-import 'react-barcode-scanner/polyfill';
-
-/** Linear formats found on medicine boxes, plus Code 128 for the app's own labels. */
-const FORMATS = ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'itf'];
-
-export const CAMERA_MESSAGES = {
-  blocked:
-    'Camera access was blocked. Allow it in your browser settings, or type the barcode.',
-  missing: 'No camera found. Type the barcode instead.',
-  insecure: 'The camera needs HTTPS. Type the barcode, or open the app over HTTPS.',
-  failed: "The camera couldn't start. Type the barcode instead.",
-};
-
-export function getCameraErrorMessage(error: Error): string {
-  if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
-    return CAMERA_MESSAGES.blocked;
-  }
-  if (error.name === 'NotFoundError' || error.name === 'OverconstrainedError') {
-    return CAMERA_MESSAGES.missing;
-  }
-  // react-barcode-scanner throws plain errors for an insecure origin or a missing getUserMedia.
-  if (/secure origin|getUserMedia/i.test(error.message)) {
-    return CAMERA_MESSAGES.insecure;
-  }
-  return CAMERA_MESSAGES.failed;
-}
+import { Box, chakra, NativeSelect, Stack, Text } from '@chakra-ui/react';
+import { useBarcodeCamera } from '@/hooks/use-barcode-camera';
 
 export interface CameraScannerProps {
-  /** Called once with the first code read. Unmount the scanner to turn the camera off. */
+  /** Called once with the first code read. The camera stops at that point. */
   onDetected: (code: string) => void;
 }
 
 /** Loaded through `LazyCameraScanner`, because the scanner only runs in the browser. */
 export default function CameraScanner({ onDetected }: CameraScannerProps) {
-  const [error, setError] = useState<string | null>(null);
-  const detected = useRef(false);
-
-  function handleCapture(barcodes: DetectedBarcode[]) {
-    const code = barcodes[0]?.rawValue.trim();
-    if (detected.current || !code) {
-      return;
-    }
-    detected.current = true;
-    onDetected(code);
-  }
+  const { videoRef, error, devices, deviceId, selectDevice } = useBarcodeCamera(onDetected);
 
   if (error) {
     return (
@@ -58,25 +21,43 @@ export default function CameraScanner({ onDetected }: CameraScannerProps) {
   }
 
   return (
-    <Box
-      width="full"
-      aspectRatio={4 / 3}
-      maxH="xs"
-      overflow="hidden"
-      rounded="md"
-      borderWidth="1px"
-      borderColor="border"
-      bg="bg.muted"
-    >
-      <BarcodeScanner
-        aria-label="Camera preview"
-        options={{ formats: FORMATS, delay: 300 }}
-        onCapture={handleCapture}
-        onCameraError={(cameraError) => setError(getCameraErrorMessage(cameraError))}
-        onScanError={(scanError) => setError(getCameraErrorMessage(scanError))}
-        muted
-        playsInline
-      />
-    </Box>
+    <Stack gap="2" width="full">
+      <Box
+        width="full"
+        aspectRatio={4 / 3}
+        maxH="xs"
+        overflow="hidden"
+        rounded="md"
+        borderWidth="1px"
+        borderColor="border"
+        bg="bg.muted"
+      >
+        <chakra.video
+          ref={videoRef}
+          aria-label="Camera preview"
+          width="full"
+          height="full"
+          objectFit="cover"
+          muted
+          playsInline
+        />
+      </Box>
+      {devices.length > 1 && (
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            aria-label="Camera"
+            value={deviceId}
+            onChange={(event) => selectDevice(event.target.value)}
+          >
+            {devices.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      )}
+    </Stack>
   );
 }

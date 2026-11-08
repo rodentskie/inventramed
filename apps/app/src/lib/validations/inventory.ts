@@ -20,7 +20,14 @@ const INVENTORY_REASONS = [
 ] as const;
 const INVENTORY_DIRECTIONS = ['IN', 'OUT'] as const;
 
-const quantity = z.number().int().min(1).max(QUANTITY_MAX);
+const QUANTITY_MESSAGE = 'Enter a whole number from 1 to 1,000,000.';
+const COUNT_MESSAGE = 'Enter a whole number from 0 to 1,000,000.';
+
+const quantity = z
+  .number(QUANTITY_MESSAGE)
+  .int(QUANTITY_MESSAGE)
+  .min(1, QUANTITY_MESSAGE)
+  .max(QUANTITY_MAX, QUANTITY_MESSAGE);
 const requiredNotes = requiredText(NOTES_MAX_LENGTH);
 
 export const dispenseSchema = z.strictObject({
@@ -36,13 +43,17 @@ export const batchMovementSchema = z.discriminatedUnion('reason', [
   }),
   z.strictObject({
     reason: z.literal('RETURNED'),
-    direction: z.enum(INVENTORY_DIRECTIONS),
+    direction: z.enum(INVENTORY_DIRECTIONS, 'Choose a direction.'),
     quantity,
     notes: requiredNotes,
   }),
   z.strictObject({
     reason: z.literal('COUNT_ADJUSTMENT'),
-    countedQuantity: z.number().int().min(0).max(QUANTITY_MAX),
+    countedQuantity: z
+      .number(COUNT_MESSAGE)
+      .int(COUNT_MESSAGE)
+      .min(0, COUNT_MESSAGE)
+      .max(QUANTITY_MAX, COUNT_MESSAGE),
     notes: requiredNotes,
   }),
 ]);

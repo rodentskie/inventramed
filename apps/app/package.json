@@ -119,6 +119,8 @@
     "@emotion/react": "^11.14.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "bcrypt": "^6.0.0",
     "dotenv": "^16.4.7",
     "next": "~16.4.1",
@@ -126,11 +128,11 @@
     "pg": "^8.23.1",
     "react": "^19.0.0",
     "react-barcode": "^1.6.1",
-    "react-barcode-scanner": "^4.1.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.7.0",
     "server-only": "^0.0.1",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "zustand": "^5.1.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

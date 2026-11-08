@@ -1,4 +1,4 @@
-import { Flex, Stack } from '@chakra-ui/react';
+import { Flex, HStack, Stack } from '@chakra-ui/react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
@@ -9,6 +9,7 @@ import { DeleteMedicineDialog } from '@/components/medicines/DeleteMedicineDialo
 import { MedicineDetails } from '@/components/medicines/MedicineDetails';
 import { MedicineFormDialog } from '@/components/medicines/MedicineFormDialog';
 import { ReceiveStockDialog } from '@/components/medicines/ReceiveStockDialog';
+import { MedicineStockActions } from '@/components/movements/MedicineStockActions';
 import { ApiError } from '@/lib/api-response';
 import { getCurrentUser, requirePageUser } from '@/lib/auth';
 import { formatMedicineName } from '@/lib/format';
@@ -56,7 +57,9 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
   }
 
   const canWrite = hasPermission(user.permissions, 'medicine:write');
-  const canReceive = canWrite && hasPermission(user.permissions, 'inventory:write');
+  const canMove = hasPermission(user.permissions, 'inventory:write');
+  const canReceive = canWrite && canMove;
+  const { id, name, strength, unit } = medicine;
 
   return (
     <Stack gap="8">
@@ -78,13 +81,17 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
             title="Batches"
             description="First-expired, first-out order. Empty batches stay for their history."
           />
-          {canReceive && <ReceiveStockDialog medicineId={medicine.id} today={context.today} />}
+          <HStack gap="2" wrap="wrap">
+            {canMove && <MedicineStockActions medicine={medicine} />}
+            {canReceive && <ReceiveStockDialog medicineId={medicine.id} today={context.today} />}
+          </HStack>
         </Flex>
         <BatchTable
           batches={medicine.batches}
           unit={medicine.unit}
           canEdit={canWrite}
           timezone={context.timezone}
+          movements={{ medicine: { id, name, strength, unit }, canMove, canReceive }}
         />
       </Stack>
     </Stack>

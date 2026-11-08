@@ -4,7 +4,14 @@ import { MedicineTable } from '../../../src/components/medicines/MedicineTable';
 import { renderWithChakra } from '../../test-utils';
 import { batch, medicine } from './fixtures';
 
-jest.mock('@/actions/medicines', () => ({ updateBatchAction: jest.fn() }));
+jest.mock('@/actions/medicines', () => ({
+  updateBatchAction: jest.fn(),
+  receiveStockAction: jest.fn(),
+}));
+jest.mock('@/actions/inventory', () => ({
+  disposeExpiredAction: jest.fn(),
+  recordMovementAction: jest.fn(),
+}));
 
 // The menu's floating positioning needs it, and jsdom doesn't have it.
 beforeAll(() => {
@@ -117,5 +124,45 @@ describe('BatchTable', () => {
     await waitFor(() =>
       expect(Boolean(screen.queryByRole('menuitem', { name: 'Edit batch' }))).toBe(shown),
     );
+  });
+
+  describe('batch movements', () => {
+    const target = batch({ status: 'EXPIRED', daysToExpiry: -2, quantity: 20 });
+
+    function openMenu(canMove: boolean, canReceive: boolean) {
+      renderWithChakra(
+        <BatchTable
+          batches={[target]}
+          unit="pc"
+          canEdit={false}
+          timezone="Asia/Manila"
+          movements={{ medicine: medicine(), canMove, canReceive }}
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Actions for batch P778' }));
+    }
+
+    it('adds the batch actions to the menu', async () => {
+      openMenu(true, true);
+
+      for (const name of ['Receive more', 'Count', 'Damaged', 'Lost', 'Returned', 'Dispose']) {
+        expect(await screen.findByRole('menuitem', { name })).toBeTruthy();
+      }
+    });
+
+    it('hides them without inventory:write', async () => {
+      openMenu(false, false);
+
+      await screen.findByRole('menuitem', { name: 'Print label' });
+      expect(screen.queryByRole('menuitem', { name: 'Count' })).toBeNull();
+    });
+
+    it('opens the form for the chosen action', async () => {
+      openMenu(true, false);
+
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Count' }));
+
+      expect(await screen.findByLabelText(/Counted quantity/)).toBeTruthy();
+    });
   });
 });

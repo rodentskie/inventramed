@@ -11,13 +11,17 @@ export const metadata: Metadata = { title: 'Scan' };
 export default async function ScanPage() {
   const user = await requirePageUser('medicine:read');
   const { timezone } = await getExpiryContext();
+  const canWrite = hasPermission(user.permissions, 'medicine:write');
+  const canMove = hasPermission(user.permissions, 'inventory:write');
 
   return (
     <Stack gap="6">
       <PageHeader title="Scan" />
       <ScanView
         timezone={timezone}
-        canCreate={hasPermission(user.permissions, 'medicine:write')}
+        canCreate={canWrite}
+        canMove={canMove}
+        canReceive={canWrite && canMove}
       />
     </Stack>
   );

@@ -43,3 +43,8 @@ export interface BatchMovementResult {
   transaction: InventoryTransaction | null;
   batch: MedicineBatch;
 }
+
+/** A movement that needs a batch. `dispose` also works on a whole medicine. */
+export type BatchMovementAction = 'receive' | 'count' | 'damaged' | 'lost' | 'returned' | 'dispose';
+
+export type MovementAction = BatchMovementAction | 'dispense';

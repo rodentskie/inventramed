@@ -73,6 +73,8 @@ export async function receiveStockAction(
     const id = parseInput(idSchema, medicineId);
     const result = await receiveStock(user.id, id, parseInput(receiveStockSchema, input));
     revalidateMedicine(id);
+    revalidatePath('/');
+    revalidatePath('/scan');
     return result;
   });
 }

@@ -5,7 +5,7 @@ import MedicinesPage from '../../src/app/(app)/medicines/page';
 import { notFound as apiNotFound } from '../../src/lib/api-response';
 import { requirePageUser } from '../../src/lib/auth';
 import { getExpiryContext, getMedicine, listMedicines } from '../../src/lib/medicines';
-import { medicine, MEDICINE_ID } from '../components/medicines/fixtures';
+import { batch, medicine, MEDICINE_ID } from '../components/medicines/fixtures';
 import { renderWithChakra } from '../test-utils';
 
 jest.mock('next/navigation', () => ({
@@ -26,6 +26,7 @@ jest.mock('@/lib/medicines', () => ({
   getExpiryContext: jest.fn(),
 }));
 jest.mock('@/actions/medicines', () => ({}));
+jest.mock('@/actions/inventory', () => ({}));
 jest.mock('@/components/common/Barcode', () => ({
   Barcode: ({ value }: { value: string }) => <span>{value}</span>,
 }));
@@ -144,9 +145,9 @@ describe('/medicines/[id]', () => {
   });
 
   it.each([
-    ['read only', READ_ONLY, { edit: false, del: false, receive: false }],
-    ['medicine:write only', NO_RECEIVE, { edit: true, del: true, receive: false }],
-    ['staff', STAFF, { edit: true, del: true, receive: true }],
+    ['read only', READ_ONLY, { edit: false, del: false, receive: false, dispense: false }],
+    ['medicine:write only', NO_RECEIVE, { edit: true, del: true, receive: false, dispense: false }],
+    ['staff', STAFF, { edit: true, del: true, receive: true, dispense: true }],
   ])('shows the buttons for %s', async (_name, permissions, expected) => {
     pageUserMock.mockResolvedValue(userWith(permissions));
 
@@ -156,6 +157,20 @@ describe('/medicines/[id]', () => {
       edit: hasButton('^Edit$'),
       del: hasButton('^Delete$'),
       receive: hasButton('Receive stock'),
+      dispense: hasButton('^Dispense$'),
     }).toEqual(expected);
+  });
+
+  it.each([
+    ['no expired stock', 'SAFE', true],
+    ['expired stock', 'EXPIRED', false],
+  ] as const)('with %s, Dispose expired disabled is %s', async (_name, status, disabled) => {
+    pageUserMock.mockResolvedValue(userWith(STAFF));
+    getMock.mockResolvedValue(medicine({ batches: [batch({ status })] }));
+
+    await renderPage();
+
+    const button = screen.getByRole('button', { name: 'Dispose expired' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(disabled);
   });
 });
