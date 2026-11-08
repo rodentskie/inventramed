@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { ApiError } from '@/lib/api-response';
 import { authOptions } from '@/lib/auth-options';
-import { hasPermission, type Permission } from '@/lib/permissions';
+import { hasAllPermissions, hasPermission, type Permission } from '@/lib/permissions';
 import { prisma } from '@/lib/prisma';
 import type { ActiveUser, AuthenticatedUser, CurrentUser } from '@/types/auth';
 
@@ -95,16 +95,16 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 });
 
 /**
- * For pages that need a permission. Redirects to `/login` without a user and
- * to `/` without the permission; the nav already hides the link, so this only
- * catches typed URLs. Actions still check with `requirePermission`.
+ * For pages that need permissions, all of them. Redirects to `/login` without a
+ * user and to `/` without a permission; the nav already hides the link, so this
+ * only catches typed URLs. Actions still check with `requirePermission`.
  */
-export async function requirePageUser(permission?: Permission): Promise<CurrentUser> {
+export async function requirePageUser(...permissions: Permission[]): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) {
     redirect('/login');
   }
-  if (permission && !hasPermission(user.permissions, permission)) {
+  if (!hasAllPermissions(user.permissions, permissions)) {
     redirect('/');
   }
   return user;

@@ -7,7 +7,6 @@ import { usePathname } from 'next/navigation';
 import type { IconType } from 'react-icons';
 import {
   LuArrowLeftRight,
-  LuKeyRound,
   LuLayoutDashboard,
   LuPill,
   LuScanBarcode,
@@ -25,7 +24,6 @@ const ICONS: Record<NavIcon, IconType> = {
   transactions: LuArrowLeftRight,
   scan: LuScanBarcode,
   employees: LuUsers,
-  users: LuKeyRound,
   settings: LuSettings,
   'audit-logs': LuScrollText,
 };

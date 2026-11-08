@@ -276,12 +276,13 @@ export async function listEmployees({
   search,
   page,
   pageSize,
+  status,
 }: EmployeeListQuery): Promise<EmployeeList> {
   const contains = search
     ? { contains: escapeLikePattern(search), mode: 'insensitive' as const }
     : undefined;
   const where: Prisma.UserWhereInput = {
-    employee: { deletedAt: null },
+    employee: { deletedAt: null, ...(status === 'active' && { isActive: true }) },
     ...(contains && {
       OR: [
         { username: contains },

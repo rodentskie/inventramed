@@ -23,7 +23,21 @@ const PAGE_SIZE_MAX = 100;
 const USERNAME_PATTERN = /^[a-z0-9._-]{3,100}$/;
 const PH_MOBILE_PATTERN = /^\+639\d{9}$/;
 
+const PH_LOCAL_MOBILE_PATTERN = /^09\d{9}$/;
+
 const SMS_NEEDS_CONTACT = 'A contact number is required to receive SMS alerts.';
+
+/**
+ * For forms, since numbers are usually written locally: `0917 123 4567` becomes
+ * `+639171234567`. Anything else comes back as typed, for the schema to reject.
+ */
+export function normalizeContactNumber(value: string): string {
+  const compact = value.replace(/[\s-]/g, '');
+  if (PH_LOCAL_MOBILE_PATTERN.test(compact)) {
+    return `+63${compact.slice(1)}`;
+  }
+  return PH_MOBILE_PATTERN.test(compact) ? compact : value;
+}
 
 const emailFormat = z.email();
 
@@ -111,6 +125,7 @@ export const employeeListQuerySchema = z.strictObject({
   search: text(SEARCH_MAX_LENGTH).optional(),
   page: z.coerce.number().int().min(1).max(PAGE_MAX).default(1),
   pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
+  status: z.enum(['active', 'all']).default('active'),
 });
 
 export type CreateEmployeeInput = z.output<typeof createEmployeeSchema>;

@@ -125,7 +125,7 @@ describe('listEmployees', () => {
   });
 
   it('returns mapped items with paging', async () => {
-    await expect(listEmployees({ page: 1, pageSize: 20 })).resolves.toEqual({
+    await expect(listEmployees({ page: 1, pageSize: 20, status: 'all' })).resolves.toEqual({
       items: [expected],
       total: 1,
       page: 1,
@@ -134,27 +134,35 @@ describe('listEmployees', () => {
   });
 
   it('excludes soft-deleted employees', async () => {
-    await listEmployees({ page: 1, pageSize: 20 });
+    await listEmployees({ page: 1, pageSize: 20, status: 'all' });
 
     expect(findManyMock.mock.calls[0][0].where).toEqual({
       employee: { deletedAt: null },
     });
   });
 
+  it('lists only active employees for the active status', async () => {
+    await listEmployees({ page: 1, pageSize: 20, status: 'active' });
+
+    const { where } = findManyMock.mock.calls[0][0];
+    expect(where).toEqual({ employee: { deletedAt: null, isActive: true } });
+    expect(countMock).toHaveBeenCalledWith({ where });
+  });
+
   it('skips the earlier pages', async () => {
-    await listEmployees({ page: 3, pageSize: 10 });
+    await listEmployees({ page: 3, pageSize: 10, status: 'all' });
 
     expect(findManyMock.mock.calls[0][0]).toMatchObject({ skip: 20, take: 10 });
   });
 
   it('never selects the password hash', async () => {
-    await listEmployees({ page: 1, pageSize: 20 });
+    await listEmployees({ page: 1, pageSize: 20, status: 'all' });
 
     expect(findManyMock.mock.calls[0][0].select.passwordHash).toBeUndefined();
   });
 
   it('escapes search and uses the same filter for the count', async () => {
-    await listEmployees({ search: '50%_x', page: 1, pageSize: 20 });
+    await listEmployees({ search: '50%_x', page: 1, pageSize: 20, status: 'all' });
 
     const { where } = findManyMock.mock.calls[0][0];
     expect(where.OR[0].username.contains).toBe('50\\%\\_x');

@@ -28,7 +28,7 @@ describe('SidebarNav', () => {
     expect(screen.queryByRole('link', { name: /Transactions/ })).toBeNull();
     const transactions = screen.getByText('Transactions').closest('[aria-disabled]');
     expect(transactions?.textContent).toContain('Soon');
-    expect(screen.getAllByText('Soon')).toHaveLength(5);
+    expect(screen.getAllByText('Soon')).toHaveLength(3);
   });
 
   it('renders Medicines and Scan as links', () => {

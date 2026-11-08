@@ -1,6 +1,7 @@
 import {
   createEmployeeSchema,
   employeeListQuerySchema,
+  normalizeContactNumber,
   updateEmployeeSchema,
 } from '../../../src/lib/validations/employee';
 
@@ -211,19 +212,46 @@ describe('updateEmployeeSchema', () => {
 
 describe('employeeListQuerySchema', () => {
   it('applies defaults', () => {
-    expect(employeeListQuerySchema.parse({})).toEqual({ page: 1, pageSize: 20 });
+    expect(employeeListQuerySchema.parse({})).toEqual({
+      page: 1,
+      pageSize: 20,
+      status: 'active',
+    });
   });
 
   it('coerces and trims', () => {
     expect(
       employeeListQuerySchema.parse({ search: ' maria ', page: '2', pageSize: '5' }),
-    ).toEqual({ search: 'maria', page: 2, pageSize: 5 });
+    ).toEqual({ search: 'maria', page: 2, pageSize: 5, status: 'active' });
   });
 
-  it.each([{ page: '0' }, { pageSize: '101' }, { unknown: '1' }])(
+  it('accepts the all status', () => {
+    expect(employeeListQuerySchema.parse({ status: 'all' }).status).toBe('all');
+  });
+
+  it.each([{ page: '0' }, { pageSize: '101' }, { unknown: '1' }, { status: 'inactive' }])(
     'rejects %j',
     (query) => {
       expect(employeeListQuerySchema.safeParse(query).success).toBe(false);
+    },
+  );
+});
+
+describe('normalizeContactNumber', () => {
+  it.each([
+    ['09171234567', '+639171234567'],
+    ['+639171234567', '+639171234567'],
+    ['0917 123 4567', '+639171234567'],
+    ['0917-123-4567', '+639171234567'],
+    ['+63 917 123 4567', '+639171234567'],
+  ])('converts %s', (input, expected) => {
+    expect(normalizeContactNumber(input)).toBe(expected);
+  });
+
+  it.each(['', '0917123456', '08171234567', '+14155552671', 'abc 123'])(
+    'leaves %j for the schema to reject',
+    (input) => {
+      expect(normalizeContactNumber(input)).toBe(input);
     },
   );
 });

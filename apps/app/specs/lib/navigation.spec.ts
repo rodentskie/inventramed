@@ -40,6 +40,16 @@ describe('getVisibleNav', () => {
     expect(groups[1].items.map((item) => item.label)).toEqual(['Audit logs']);
   });
 
+  it('hides an item when only some of its permissions are granted', () => {
+    expect(labels(['employee:manage'])).not.toContain('Employees');
+    expect(labels(['user:manage'])).not.toContain('Employees');
+    expect(labels(['employee:manage', 'user:manage'])).toContain('Employees');
+  });
+
+  it('has one item for employees and their accounts', () => {
+    expect(labels(['*'])).not.toContain('Users & roles');
+  });
+
   it('always shows the dashboard', () => {
     expect(labels([])).toEqual(['Dashboard']);
   });
@@ -50,6 +60,7 @@ describe('getVisibleNav', () => {
     expect(items.find((item) => item.label === 'Dashboard')?.enabled).toBe(true);
     expect(items.find((item) => item.label === 'Medicines')?.enabled).toBe(true);
     expect(items.find((item) => item.label === 'Scan')?.enabled).toBe(true);
+    expect(items.find((item) => item.label === 'Employees')?.enabled).toBe(true);
     expect(items.find((item) => item.label === 'Transactions')?.enabled).toBe(false);
   });
 });

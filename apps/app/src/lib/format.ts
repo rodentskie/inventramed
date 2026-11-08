@@ -53,3 +53,7 @@ export function formatMedicineName(name: string, strength: string | null): strin
 export function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
+
+export function formatEmployeeName(employee: { firstName: string; lastName: string }): string {
+  return `${employee.firstName} ${employee.lastName}`;
+}

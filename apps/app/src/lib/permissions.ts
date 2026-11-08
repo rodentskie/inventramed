@@ -14,6 +14,9 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
+/** An employee and their login are managed together, so every operation needs both. */
+export const EMPLOYEE_PERMISSIONS = ['employee:manage', 'user:manage'] as const;
+
 type Resource = Permission extends `${infer R}:${string}` ? R : never;
 
 export type GrantablePermission = Permission | `${Resource}:*` | '*';
@@ -40,4 +43,11 @@ export function hasPermission(
   return granted.some(
     (g) => g === '*' || g === required || g === `${resource}:*`,
   );
+}
+
+export function hasAllPermissions(
+  granted: readonly string[],
+  required: readonly Permission[],
+): boolean {
+  return required.every((permission) => hasPermission(granted, permission));
 }
