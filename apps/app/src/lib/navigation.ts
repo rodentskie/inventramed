@@ -1,4 +1,4 @@
-import { hasPermission } from '@/lib/permissions';
+import { EMPLOYEE_PERMISSIONS, hasAllPermissions } from '@/lib/permissions';
 import type { NavGroup, NavItem } from '@/types/dashboard';
 
 /** Items with `enabled: false` are screens from later features. */
@@ -6,29 +6,28 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: null,
     items: [
-      { label: 'Dashboard', href: '/', icon: 'dashboard', permission: null, enabled: true },
+      { label: 'Dashboard', href: '/', icon: 'dashboard', permissions: [], enabled: true },
     ],
   },
   {
     label: 'Inventory',
     items: [
-      { label: 'Medicines', href: '/medicines', icon: 'medicines', permission: 'medicine:read', enabled: true },
-      { label: 'Transactions', href: '/inventory/transactions', icon: 'transactions', permission: 'inventory:read', enabled: false },
-      { label: 'Scan', href: '/scan', icon: 'scan', permission: 'medicine:read', enabled: true },
+      { label: 'Medicines', href: '/medicines', icon: 'medicines', permissions: ['medicine:read'], enabled: true },
+      { label: 'Transactions', href: '/inventory/transactions', icon: 'transactions', permissions: ['inventory:read'], enabled: false },
+      { label: 'Scan', href: '/scan', icon: 'scan', permissions: ['medicine:read'], enabled: true },
     ],
   },
   {
     label: 'People',
     items: [
-      { label: 'Employees', href: '/employees', icon: 'employees', permission: 'employee:manage', enabled: false },
-      { label: 'Users & roles', href: '/users', icon: 'users', permission: 'user:manage', enabled: false },
+      { label: 'Employees', href: '/employees', icon: 'employees', permissions: [...EMPLOYEE_PERMISSIONS], enabled: true },
     ],
   },
   {
     label: 'System',
     items: [
-      { label: 'Settings', href: '/settings', icon: 'settings', permission: 'settings:manage', enabled: false },
-      { label: 'Audit logs', href: '/audit-logs', icon: 'audit-logs', permission: 'audit:read', enabled: false },
+      { label: 'Settings', href: '/settings', icon: 'settings', permissions: ['settings:manage'], enabled: false },
+      { label: 'Audit logs', href: '/audit-logs', icon: 'audit-logs', permissions: ['audit:read'], enabled: false },
     ],
   },
 ];
@@ -37,9 +36,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 export function getVisibleNav(permissions: readonly string[]): NavGroup[] {
   return NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter(
-      (item) => !item.permission || hasPermission(permissions, item.permission),
-    ),
+    items: group.items.filter((item) => hasAllPermissions(permissions, item.permissions)),
   })).filter((group) => group.items.length > 0);
 }
 

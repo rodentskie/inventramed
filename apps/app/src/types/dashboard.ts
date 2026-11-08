@@ -54,7 +54,6 @@ export type NavIcon =
   | 'transactions'
   | 'scan'
   | 'employees'
-  | 'users'
   | 'settings'
   | 'audit-logs';
 
@@ -62,7 +61,8 @@ export interface NavItem {
   label: string;
   href: string;
   icon: NavIcon;
-  permission: Permission | null;
+  /** All are required. Empty means every signed-in user. */
+  permissions: Permission[];
   enabled: boolean;
 }
 

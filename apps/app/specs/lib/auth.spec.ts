@@ -231,6 +231,11 @@ describe('requirePageUser', () => {
     });
   });
 
+  it('requires every permission when given several', async () => {
+    await expect(requirePageUser('medicine:read', 'medicine:write')).rejects.toThrow('redirect:/');
+    await expect(requirePageUser('medicine:read')).resolves.toMatchObject({ id: 'user-1' });
+  });
+
   it('only needs a user without a permission', async () => {
     findUniqueMock.mockResolvedValue({ ...activeUser, role: { name: 'x', permissions: [] } });
 

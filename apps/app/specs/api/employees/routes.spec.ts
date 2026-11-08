@@ -154,7 +154,13 @@ describe('GET /api/employees', () => {
       success: true,
       data: list,
     });
-    expect(listMock).toHaveBeenCalledWith({ page: 1, pageSize: 20 });
+    expect(listMock).toHaveBeenCalledWith({ page: 1, pageSize: 20, status: 'active' });
+  });
+
+  it('passes the status through', async () => {
+    await get('?status=all');
+
+    expect(listMock).toHaveBeenCalledWith({ page: 1, pageSize: 20, status: 'all' });
   });
 
   it('passes search and paging through', async () => {
@@ -164,6 +170,7 @@ describe('GET /api/employees', () => {
       search: 'maria',
       page: 2,
       pageSize: 5,
+      status: 'active',
     });
   });
 
