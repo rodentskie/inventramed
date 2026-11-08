@@ -2,28 +2,24 @@
 
 import { Box, Button, Field, Grid, Group, Input, Separator, Stack, Text } from '@chakra-ui/react';
 import { EmptyState, toaster } from '@inventra-med/components';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { LuCamera, LuCameraOff, LuSearchX } from 'react-icons/lu';
 import { lookupBarcodeAction } from '@/actions/scan';
 import { MedicineFormDialog } from '@/components/medicines/MedicineFormDialog';
 import { LazyCameraScanner } from '@/components/scan/LazyCameraScanner';
 import { ScanResult } from '@/components/scan/ScanResult';
 import { GENERIC_ERROR } from '@/hooks/use-action-submit';
+import type { MovementPermissions } from '@/lib/batch-stock';
 import { OWN_PREFIX_PATTERN } from '@/lib/validations/barcode';
-import type { ScanResult as ScanResultData } from '@/types/medicine';
+import { useScanStore } from '@/stores/scan-store';
 
 export const NOT_FOUND_MESSAGE = 'No medicine has this barcode.';
 
-interface ScanViewProps {
+interface ScanViewProps extends MovementPermissions {
   timezone: string;
   /** `medicine:write`, which offers to add a medicine for an unknown product code. */
   canCreate: boolean;
 }
-
-type Outcome =
-  | { kind: 'idle' }
-  | { kind: 'found'; result: ScanResultData }
-  | { kind: 'not-found'; code: string };
 
 function NotFound({ code, canCreate }: { code: string; canCreate: boolean }) {
   const isProductCode = !OWN_PREFIX_PATTERN.test(code);
@@ -44,20 +40,30 @@ function NotFound({ code, canCreate }: { code: string; canCreate: boolean }) {
 }
 
 /** Camera, typed input and result. A USB scanner types into the input and presses Enter. */
-export function ScanView({ timezone, canCreate }: ScanViewProps) {
-  const [cameraOn, setCameraOn] = useState(false);
+export function ScanView({ timezone, canCreate, canMove, canReceive }: ScanViewProps) {
+  const cameraOn = useScanStore((state) => state.cameraOn);
+  const outcome = useScanStore((state) => state.outcome);
+  const setCameraOn = useScanStore((state) => state.setCameraOn);
+  const setOutcome = useScanStore((state) => state.setOutcome);
+  const latestLookup = useRef(0);
   const [code, setCode] = useState('');
   const [inputError, setInputError] = useState<string>();
   const [isLooking, setIsLooking] = useState(false);
-  const [outcome, setOutcome] = useState<Outcome>({ kind: 'idle' });
+
+  useEffect(() => useScanStore.getState().reset, []);
 
   async function lookUp(value: string) {
+    const lookup = ++latestLookup.current;
     setIsLooking(true);
     setInputError(undefined);
     try {
       const result = await lookupBarcodeAction(value);
+      // A newer scan wins, so stock is never shown or moved for the wrong item.
+      if (lookup !== latestLookup.current) {
+        return;
+      }
       if (result.success) {
-        setOutcome({ kind: 'found', result: result.data });
+        setOutcome({ kind: 'found', code: value, result: result.data });
       } else if (result.error.code === 'NOT_FOUND') {
         setOutcome({ kind: 'not-found', code: value.trim() });
       } else if (result.error.code === 'VALIDATION_ERROR') {
@@ -68,7 +74,15 @@ export function ScanView({ timezone, canCreate }: ScanViewProps) {
     } catch {
       toaster.create({ type: 'error', title: GENERIC_ERROR });
     } finally {
-      setIsLooking(false);
+      if (lookup === latestLookup.current) {
+        setIsLooking(false);
+      }
+    }
+  }
+
+  function refreshResult() {
+    if (outcome.kind === 'found') {
+      void lookUp(outcome.code);
     }
   }
 
@@ -109,7 +123,7 @@ export function ScanView({ timezone, canCreate }: ScanViewProps) {
             </Box>
           )}
           <Box>
-            <Button size="sm" variant="outline" onClick={() => setCameraOn((on) => !on)}>
+            <Button size="sm" variant="outline" onClick={() => setCameraOn(!cameraOn)}>
               {cameraOn ? <LuCameraOff /> : <LuCamera />}
               {cameraOn ? 'Stop camera' : outcome.kind === 'idle' ? 'Start camera' : 'Scan again'}
             </Button>
@@ -136,7 +150,15 @@ export function ScanView({ timezone, canCreate }: ScanViewProps) {
         </form>
       </Grid>
       {outcome.kind !== 'idle' && <Separator />}
-      {outcome.kind === 'found' && <ScanResult result={outcome.result} timezone={timezone} />}
+      {outcome.kind === 'found' && (
+        <ScanResult
+          result={outcome.result}
+          timezone={timezone}
+          canMove={canMove}
+          canReceive={canReceive}
+          onMoved={refreshResult}
+        />
+      )}
       {outcome.kind === 'not-found' && <NotFound code={outcome.code} canCreate={canCreate} />}
     </Stack>
   );

@@ -3,16 +3,19 @@ import NextLink from 'next/link';
 import { LuArrowRight } from 'react-icons/lu';
 import { BatchTable } from '@/components/medicines/BatchTable';
 import { MedicineDetails } from '@/components/medicines/MedicineDetails';
+import { ScanActions } from '@/components/scan/ScanActions';
+import type { MovementPermissions } from '@/lib/batch-stock';
 import { formatMedicineName } from '@/lib/format';
 import type { ScanResult as ScanResultData } from '@/types/medicine';
 
-interface ScanResultProps {
+interface ScanResultProps extends MovementPermissions {
   result: ScanResultData;
   timezone: string;
+  onMoved: () => void;
 }
 
-/** The scanned medicine, read-only. Editing and stock changes happen on its own page. */
-export function ScanResult({ result, timezone }: ScanResultProps) {
+/** The scanned medicine and its movements. Editing happens on the medicine's own page. */
+export function ScanResult({ result, timezone, canMove, canReceive, onMoved }: ScanResultProps) {
   const { medicine } = result;
   const batch =
     result.kind === 'batch'
@@ -39,6 +42,13 @@ export function ScanResult({ result, timezone }: ScanResultProps) {
           </NextLink>
         </Button>
       </Flex>
+      <ScanActions
+        medicine={medicine}
+        batch={batch}
+        canMove={canMove}
+        canReceive={canReceive}
+        onMoved={onMoved}
+      />
       <MedicineDetails medicine={medicine} />
       <BatchTable
         batches={medicine.batches}

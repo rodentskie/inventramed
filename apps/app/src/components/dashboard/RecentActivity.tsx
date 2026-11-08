@@ -1,4 +1,4 @@
-import { Flex, Stack, StackSeparator, Text } from '@chakra-ui/react';
+import { Flex, Stack, Text } from '@chakra-ui/react';
 import { EmptyState, Tooltip } from '@inventra-med/components';
 import { LuHistory } from 'react-icons/lu';
 import { SectionHeading } from '@/components/dashboard/SectionHeading';
@@ -55,7 +55,9 @@ export function RecentActivity({ items, now = new Date() }: { items: ActivityIte
       ) : (
         <Stack
           gap="0"
-          separator={<StackSeparator />}
+          // CSS dividers: Stack's `separator` inspects its children, which differ between SSR and the
+          // client when they come from a server component, and that breaks hydration.
+          divideY="1px"
           borderWidth="1px"
           borderColor="border"
           rounded="md"

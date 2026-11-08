@@ -56,3 +56,6 @@ export interface BatchLabel {
 export type ScanResult =
   | { kind: 'medicine' | 'product'; medicine: MedicineDetail }
   | { kind: 'batch'; batchId: string; medicine: MedicineDetail };
+
+/** What a movement form needs to name a medicine and count its stock. */
+export type MovementMedicine = Pick<Medicine, 'id' | 'name' | 'strength' | 'unit'>;
