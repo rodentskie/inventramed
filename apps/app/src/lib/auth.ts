@@ -1,5 +1,6 @@
 import 'server-only';
 import { getServerSession } from 'next-auth';
+import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { ApiError } from '@/lib/api-response';
 import { authOptions } from '@/lib/auth-options';
@@ -92,6 +93,22 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     permissions: user.role.permissions.map((p) => p.permission),
   };
 });
+
+/**
+ * For pages that need a permission. Redirects to `/login` without a user and
+ * to `/` without the permission; the nav already hides the link, so this only
+ * catches typed URLs. Actions still check with `requirePermission`.
+ */
+export async function requirePageUser(permission?: Permission): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect('/login');
+  }
+  if (permission && !hasPermission(user.permissions, permission)) {
+    redirect('/');
+  }
+  return user;
+}
 
 /**
  * Checks the session, then reads the user's status and permissions from the

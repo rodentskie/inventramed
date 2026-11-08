@@ -12,9 +12,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: 'Inventory',
     items: [
-      { label: 'Medicines', href: '/medicines', icon: 'medicines', permission: 'medicine:read', enabled: false },
+      { label: 'Medicines', href: '/medicines', icon: 'medicines', permission: 'medicine:read', enabled: true },
       { label: 'Transactions', href: '/inventory/transactions', icon: 'transactions', permission: 'inventory:read', enabled: false },
-      { label: 'Scan', href: '/scan', icon: 'scan', permission: 'medicine:read', enabled: false },
+      { label: 'Scan', href: '/scan', icon: 'scan', permission: 'medicine:read', enabled: true },
     ],
   },
   {

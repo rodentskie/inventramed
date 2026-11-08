@@ -5,7 +5,12 @@ import type {
   MedicineBatch as MedicineBatchRow,
 } from '@/generated/prisma/client';
 import { ApiError, notFound } from '@/lib/api-response';
-import { generateBatchBarcode, generateMedicineBarcode } from '@/lib/barcode';
+import {
+  generateBatchBarcode,
+  generateMedicineBarcode,
+  parseBarcode,
+  productBarcodeVariants,
+} from '@/lib/barcode';
 import {
   fromDateString,
   getDaysToExpiry,
@@ -24,18 +29,23 @@ import type {
 } from '@/lib/validations/medicine';
 import { withActor } from '@/lib/with-actor';
 import type {
+  BatchLabel,
   Medicine,
   MedicineBatch,
   MedicineDetail,
   MedicineList,
   ReceiveStockResult,
+  ScanResult,
 } from '@/types/medicine';
+
+const PRODUCT_BARCODE_TAKEN = 'Another medicine already has this product barcode.';
 
 type Tx = Prisma.TransactionClient;
 
-interface ExpiryContext {
+export interface ExpiryContext {
   today: string;
   threshold: number;
+  timezone: string;
 }
 
 interface DuplicateKey {
@@ -58,6 +68,7 @@ export async function getExpiryContext(
   return {
     today: getLocalToday(settings.timezone),
     threshold: settings.nearExpiryThresholdDays,
+    timezone: settings.timezone,
   };
 }
 
@@ -70,6 +81,7 @@ function toMedicine(row: MedicineRow, totalStock: number): Medicine {
     dosageForm: row.dosageForm,
     unit: row.unit,
     barcode: row.barcode,
+    productBarcode: row.productBarcode,
     totalStock,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -91,6 +103,31 @@ export function toBatch(row: MedicineBatchRow, context: ExpiryContext): Medicine
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/**
+ * Medicines have two unique columns, and the generated `MED-` code is random,
+ * so a clash on `product_barcode` is the one worth reporting to the user.
+ */
+function isProductBarcodeClash(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002' &&
+    /product_?barcode/i.test(JSON.stringify(error.meta ?? {}))
+  );
+}
+
+async function guardProductBarcode<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (isProductBarcodeClash(error)) {
+      throw new ApiError(409, 'PRODUCT_BARCODE_DUPLICATE', PRODUCT_BARCODE_TAKEN, {
+        productBarcode: [PRODUCT_BARCODE_TAKEN],
+      });
+    }
+    throw error;
+  }
 }
 
 async function getTotalStock(client: Tx, medicineId: string): Promise<number> {
@@ -220,7 +257,7 @@ export async function createMedicine(
   actorId: string,
   input: CreateMedicineInput,
 ): Promise<Medicine> {
-  return withActor(actorId, async (tx) => {
+  return guardProductBarcode(() => withActor(actorId, async (tx) => {
     await assertNotDuplicate(
       tx,
       {
@@ -238,7 +275,7 @@ export async function createMedicine(
       },
     });
     return toMedicine(row, 0);
-  });
+  }));
 }
 
 export async function updateMedicine(
@@ -246,7 +283,7 @@ export async function updateMedicine(
   id: string,
   input: UpdateMedicineInput,
 ): Promise<Medicine> {
-  return withActor(actorId, async (tx) => {
+  return guardProductBarcode(() => withActor(actorId, async (tx) => {
     const current = await lockActiveMedicine(tx, id);
     const merged: DuplicateKey = {
       name: input.name ?? current.name,
@@ -265,7 +302,7 @@ export async function updateMedicine(
 
     const row = await tx.medicine.update({ where: { id }, data: input });
     return toMedicine(row, await getTotalStock(tx, id));
-  });
+  }));
 }
 
 export async function softDeleteMedicine(
@@ -281,7 +318,11 @@ export async function softDeleteMedicine(
         'This medicine still has stock and cannot be deleted.',
       );
     }
-    await tx.medicine.update({ where: { id }, data: { deletedAt: new Date() } });
+    // Freeing the product barcode lets the same product be added again; the audit log keeps it.
+    await tx.medicine.update({
+      where: { id },
+      data: { deletedAt: new Date(), productBarcode: null },
+    });
     return { id };
   });
 }
@@ -360,6 +401,61 @@ export async function getBatch(
     throw notFound();
   }
   return toBatch(row, await getExpiryContext());
+}
+
+/** Looks a batch up by its ID alone, for the printable label. */
+export async function getBatchLabel(batchId: string): Promise<BatchLabel> {
+  const row = await prisma.medicineBatch.findFirst({
+    where: { id: batchId, medicine: { deletedAt: null } },
+    select: {
+      batchNumber: true,
+      barcode: true,
+      expirationDate: true,
+      medicine: { select: { name: true, strength: true } },
+    },
+  });
+  if (!row) {
+    throw notFound();
+  }
+  return {
+    medicineName: row.medicine.name,
+    strength: row.medicine.strength,
+    batchNumber: row.batchNumber,
+    expirationDate: toDateString(row.expirationDate),
+    barcode: row.barcode,
+  };
+}
+
+/**
+ * Resolves a code from `barcodeLookupSchema`: `MED-` to a medicine, `BAT-` to a
+ * batch and its medicine, anything else to a product barcode.
+ */
+export async function findByBarcode(code: string): Promise<ScanResult> {
+  const parsed = parseBarcode(code);
+
+  if (parsed.kind === 'batch') {
+    const batch = await prisma.medicineBatch.findFirst({
+      where: { barcode: parsed.code, medicine: { deletedAt: null } },
+      select: { id: true, medicineId: true },
+    });
+    if (!batch) {
+      throw notFound();
+    }
+    return { kind: 'batch', batchId: batch.id, medicine: await getMedicine(batch.medicineId) };
+  }
+
+  const match: Prisma.MedicineWhereInput =
+    parsed.kind === 'medicine'
+      ? { barcode: parsed.code }
+      : { productBarcode: { in: productBarcodeVariants(parsed.code) } };
+  const row = await prisma.medicine.findFirst({
+    where: { ...match, deletedAt: null },
+    select: { id: true },
+  });
+  if (!row) {
+    throw notFound();
+  }
+  return { kind: parsed.kind, medicine: await getMedicine(row.id) };
 }
 
 export async function updateBatch(

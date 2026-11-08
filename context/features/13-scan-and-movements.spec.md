@@ -2,6 +2,8 @@
 
 ## Overview
 
+> **Changed by feature 12 (2026-11-08).** Feature 12 now builds `/scan`, the camera scanner (`react-barcode-scanner`, not `@zxing/browser`), the typed input, `parseBarcode`, `findByBarcode` and `lookupBarcodeAction`. It also adds `medicines.product_barcode`, so product barcodes resolve too. Revise this spec before starting, so it only adds the movement actions to `/scan` and to the detail page.
+
 Add browser-based barcode scanning and the screens that move stock out of, or back into, batches: dispense, count correction, damaged, lost, returned and expired disposal.
 
 `/scan` reads a `MED-` or `BAT-` barcode with the device camera, or from typed input, and shows the actions that fit what was scanned. The same action forms also appear on the medicine detail page from feature 12, so every movement can be done with or without a camera.
