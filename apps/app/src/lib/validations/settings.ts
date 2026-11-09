@@ -16,7 +16,7 @@ const WORKER_POLL_INTERVAL_SECS_MAX = 86_400;
 
 const DAILY_TIME_PATTERN = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 const SMS_PLACEHOLDER_PATTERN = /\{([^{}]*)\}/g;
-const SMS_PLACEHOLDERS = new Set([
+export const SMS_PLACEHOLDERS = new Set([
   'facility',
   'date',
   'expired',
@@ -46,8 +46,10 @@ function hasOnlyKnownPlaceholders(template: string): boolean {
   );
 }
 
-const integer = (min: number, max: number) =>
-  z.number().int().min(min).max(max).optional();
+const integer = (min: number, max: number) => {
+  const message = `Enter a whole number from ${min} to ${max}.`;
+  return z.number({ error: message }).int(message).min(min, message).max(max, message).optional();
+};
 
 export const updateSettingsSchema = z
   .strictObject({
