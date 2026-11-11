@@ -22,20 +22,37 @@ describe('SidebarNav', () => {
     expect(dashboard.getAttribute('aria-current')).toBe('page');
   });
 
-  it('renders later screens as disabled entries, not links', () => {
-    renderWithChakra(<SidebarNav groups={getVisibleNav(['*'])} />);
+  it('renders a later screen as a disabled entry, not a link', () => {
+    renderWithChakra(
+      <SidebarNav
+        groups={[
+          {
+            label: null,
+            items: [
+              { label: 'Later', href: '/later', icon: 'dashboard', permissions: [], enabled: false },
+            ],
+          },
+        ]}
+      />,
+    );
 
-    expect(screen.queryByRole('link', { name: /Transactions/ })).toBeNull();
-    const transactions = screen.getByText('Transactions').closest('[aria-disabled]');
-    expect(transactions?.textContent).toContain('Soon');
-    expect(screen.getAllByText('Soon')).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: /Later/ })).toBeNull();
+    const later = screen.getByText('Later').closest('[aria-disabled]');
+    expect(later?.textContent).toContain('Soon');
   });
 
-  it('renders Medicines and Scan as links', () => {
+  it('renders every screen as a link', () => {
     renderWithChakra(<SidebarNav groups={getVisibleNav(['*'])} />);
 
     expect(screen.getByRole('link', { name: 'Medicines' }).getAttribute('href')).toBe('/medicines');
     expect(screen.getByRole('link', { name: 'Scan' }).getAttribute('href')).toBe('/scan');
+    expect(screen.getByRole('link', { name: 'Transactions' }).getAttribute('href')).toBe(
+      '/inventory/transactions',
+    );
+    expect(screen.getByRole('link', { name: 'Audit logs' }).getAttribute('href')).toBe(
+      '/audit-logs',
+    );
+    expect(screen.queryByText('Soon')).toBeNull();
   });
 
   it('shows group headings only for visible groups', () => {

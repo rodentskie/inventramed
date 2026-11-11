@@ -22,6 +22,8 @@ interface BatchTableProps {
   highlightId?: string;
   /** Adds the batch movements to each row's menu. */
   movements?: BatchMovements;
+  /** Adds a link to each batch's transactions to its menu. */
+  showHistory?: boolean;
 }
 
 interface BatchRowProps {
@@ -31,9 +33,18 @@ interface BatchRowProps {
   timezone: string;
   highlighted: boolean;
   movements?: BatchMovements;
+  showHistory?: boolean;
 }
 
-function BatchRow({ batch, unit, canEdit, timezone, highlighted, movements }: BatchRowProps) {
+function BatchRow({
+  batch,
+  unit,
+  canEdit,
+  timezone,
+  highlighted,
+  movements,
+  showHistory,
+}: BatchRowProps) {
   const empty = batch.quantity === 0;
   return (
     <Table.Row
@@ -56,7 +67,12 @@ function BatchRow({ batch, unit, canEdit, timezone, highlighted, movements }: Ba
         {formatCount(batch.quantity)} {unit}
       </Table.Cell>
       <Table.Cell textAlign="end" width="1">
-        <BatchRowMenu batch={batch} canEdit={canEdit} movements={movements} />
+        <BatchRowMenu
+          batch={batch}
+          canEdit={canEdit}
+          movements={movements}
+          showHistory={showHistory}
+        />
       </Table.Cell>
     </Table.Row>
   );
@@ -70,6 +86,7 @@ export function BatchTable({
   timezone,
   highlightId,
   movements,
+  showHistory,
 }: BatchTableProps) {
   if (batches.length === 0) {
     return (
@@ -109,6 +126,7 @@ export function BatchTable({
               timezone={timezone}
               highlighted={batch.id === highlightId}
               movements={movements}
+              showHistory={showHistory}
             />
           ))}
         </Table.Body>

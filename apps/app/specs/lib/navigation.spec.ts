@@ -67,7 +67,8 @@ describe('getVisibleNav', () => {
     expect(items.find((item) => item.label === 'Medicines')?.enabled).toBe(true);
     expect(items.find((item) => item.label === 'Scan')?.enabled).toBe(true);
     expect(items.find((item) => item.label === 'Employees')?.enabled).toBe(true);
-    expect(items.find((item) => item.label === 'Transactions')?.enabled).toBe(false);
+    expect(items.find((item) => item.label === 'Transactions')?.enabled).toBe(true);
+    expect(items.find((item) => item.label === 'Audit logs')?.enabled).toBe(true);
   });
 });
 

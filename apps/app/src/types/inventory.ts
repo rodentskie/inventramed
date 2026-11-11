@@ -19,9 +19,19 @@ export interface InventoryEntry {
   quantity: number;
 }
 
+/** Deleted medicines keep their transactions, so the name is still returned. */
+export interface InventoryTransactionMedicine {
+  id: string;
+  name: string;
+  strength: string | null;
+  unit: string;
+  deleted: boolean;
+}
+
 export interface InventoryTransaction {
   id: string;
   medicineId: string;
+  medicine: InventoryTransactionMedicine;
   direction: InventoryDirection;
   reason: InventoryReason;
   quantity: number;

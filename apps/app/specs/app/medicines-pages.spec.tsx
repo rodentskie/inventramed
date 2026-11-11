@@ -162,6 +162,21 @@ describe('/medicines/[id]', () => {
   });
 
   it.each([
+    ['inventory:read', READ_ONLY, true],
+    ['no inventory:read', NO_RECEIVE, false],
+  ])('with %s, the History link is shown: %s', async (_name, permissions, shown) => {
+    pageUserMock.mockResolvedValue(userWith(permissions));
+
+    await renderPage();
+
+    const link = screen.queryByRole('link', { name: 'History' });
+    expect(link !== null).toBe(shown);
+    if (link) {
+      expect(link.getAttribute('href')).toBe(`/inventory/transactions?medicineId=${MEDICINE_ID}`);
+    }
+  });
+
+  it.each([
     ['no expired stock', 'SAFE', true],
     ['expired stock', 'EXPIRED', false],
   ] as const)('with %s, Dispose expired disabled is %s', async (_name, status, disabled) => {

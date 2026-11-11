@@ -1,7 +1,12 @@
 import 'server-only';
 import type { Prisma } from '@/generated/prisma/client';
 import { prisma } from '@/lib/prisma';
-import type { AuditLogListQuery } from '@/lib/validations/audit-log';
+import { addDays, startOfLocalDay } from '@/lib/expiry';
+import {
+  auditLogListQuerySchema,
+  type AuditLogListQuery,
+  type AuditLogPageQuery,
+} from '@/lib/validations/audit-log';
 import type {
   AuditAction,
   AuditLog,
@@ -43,6 +48,30 @@ function toAuditLog(
     actor: (row.actorId && actors.get(row.actorId)) || null,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+export type AuditLogQueryResult =
+  | { query: AuditLogListQuery; toError: null }
+  | { query: null; toError: string };
+
+/**
+ * Turns the page's local dates into the list query. `from` is the start of its day in
+ * the timezone, and `to` the start of the next day, so the chosen `to` day is included.
+ */
+export function buildAuditLogQuery(
+  { from, to, ...rest }: AuditLogPageQuery,
+  timezone: string,
+): AuditLogQueryResult {
+  const result = auditLogListQuerySchema.safeParse({
+    ...rest,
+    from: from && startOfLocalDay(from, timezone).toISOString(),
+    to: to && startOfLocalDay(addDays(to, 1), timezone).toISOString(),
+  });
+  if (result.success) {
+    return { query: result.data, toError: null };
+  }
+  const issue = result.error.issues.find((item) => item.path[0] === 'to');
+  return { query: null, toError: issue?.message ?? 'Invalid date range.' };
 }
 
 export async function listAuditLogs({

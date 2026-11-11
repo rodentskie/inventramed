@@ -16,6 +16,7 @@ import type {
   TransactionListQuery,
 } from '@/lib/validations/inventory';
 import { withActor } from '@/lib/with-actor';
+import { formatMedicineName } from '@/lib/format';
 import type {
   BatchMovementResult,
   InventoryDirection,
@@ -27,6 +28,9 @@ import type {
 type Tx = Prisma.TransactionClient;
 
 const TRANSACTION_INCLUDE = {
+  medicine: {
+    select: { id: true, name: true, strength: true, unit: true, deletedAt: true },
+  },
   performedBy: { select: { id: true, username: true } },
   entries: {
     include: {
@@ -62,6 +66,13 @@ function toTransaction(row: TransactionRow): InventoryTransaction {
   return {
     id: row.id,
     medicineId: row.medicineId,
+    medicine: {
+      id: row.medicine.id,
+      name: row.medicine.name,
+      strength: row.medicine.strength,
+      unit: row.medicine.unit,
+      deleted: row.medicine.deletedAt !== null,
+    },
     direction: row.direction,
     reason: row.reason,
     quantity: row.quantity,
@@ -342,4 +353,37 @@ export async function getTransaction(id: string): Promise<InventoryTransaction> 
     throw notFound();
   }
   return toTransaction(row);
+}
+
+/**
+ * The chip text for the medicine and batch filters, such as `Paracetamol 500 mg · Batch P778`.
+ * Deleted medicines keep their name. Null when neither filter is set.
+ */
+export async function getTransactionFilterLabel(
+  medicineId: string | undefined,
+  batchId: string | undefined,
+): Promise<string | null> {
+  if (!medicineId && !batchId) {
+    return null;
+  }
+  const [medicine, batch] = await Promise.all([
+    medicineId
+      ? prisma.medicine.findUnique({
+          where: { id: medicineId },
+          select: { name: true, strength: true },
+        })
+      : null,
+    batchId
+      ? prisma.medicineBatch.findUnique({
+          where: { id: batchId },
+          select: { batchNumber: true },
+        })
+      : null,
+  ]);
+
+  const parts = [
+    medicineId && (medicine ? formatMedicineName(medicine.name, medicine.strength) : 'Unknown medicine'),
+    batchId && `Batch ${batch?.batchNumber ?? 'unknown'}`,
+  ];
+  return parts.filter(Boolean).join(' · ');
 }

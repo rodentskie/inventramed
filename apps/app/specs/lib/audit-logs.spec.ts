@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { listAuditLogs } from '../../src/lib/audit-logs';
+import { buildAuditLogQuery, listAuditLogs } from '../../src/lib/audit-logs';
 import { prisma } from '../../src/lib/prisma';
 
 jest.mock('@/lib/prisma', () => ({
@@ -164,5 +164,42 @@ describe('listAuditLogs', () => {
       page: 2,
       pageSize: 1,
     });
+  });
+});
+
+describe('buildAuditLogQuery', () => {
+  it('turns local days into a range covering the whole of the to day', () => {
+    expect(
+      buildAuditLogQuery(
+        { from: '2026-11-01', to: '2026-11-08', action: 'updated', ...PAGING },
+        'Asia/Manila',
+      ),
+    ).toEqual({
+      query: {
+        action: 'updated',
+        from: new Date('2026-10-31T16:00:00.000Z'),
+        to: new Date('2026-11-08T16:00:00.000Z'),
+        ...PAGING,
+      },
+      toError: null,
+    });
+  });
+
+  it('accepts a single day', () => {
+    const { query } = buildAuditLogQuery({ from: '2026-11-08', to: '2026-11-08', ...PAGING }, 'UTC');
+    expect(query).toMatchObject({
+      from: new Date('2026-11-08T00:00:00.000Z'),
+      to: new Date('2026-11-09T00:00:00.000Z'),
+    });
+  });
+
+  it('leaves out missing dates', () => {
+    expect(buildAuditLogQuery(PAGING, 'Asia/Manila')).toEqual({ query: PAGING, toError: null });
+  });
+
+  it('returns the schema message when to is before from', () => {
+    expect(
+      buildAuditLogQuery({ from: '2026-11-08', to: '2026-11-07', ...PAGING }, 'Asia/Manila'),
+    ).toEqual({ query: null, toError: 'Must be after from.' });
   });
 });

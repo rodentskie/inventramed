@@ -4,6 +4,7 @@ import {
   dispense,
   disposeExpiredStock,
   getTransaction,
+  getTransactionFilterLabel,
   listTransactions,
   recordBatchMovement,
 } from '../../src/lib/inventory';
@@ -13,6 +14,8 @@ jest.mock('@/lib/prisma', () => ({
   prisma: {
     $transaction: jest.fn(),
     setting: { findUniqueOrThrow: jest.fn() },
+    medicine: { findUnique: jest.fn() },
+    medicineBatch: { findUnique: jest.fn() },
     inventoryTransaction: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
@@ -27,10 +30,19 @@ const BATCH_ID = 'batch-1';
 const AT = new Date('2026-11-06T02:00:00.000Z');
 const SETTINGS = { timezone: 'Asia/Manila', nearExpiryThresholdDays: 30 };
 const MEDICINE_LOCK = [{ name: 'x', strength: null, dosage_form: null }];
+const MEDICINE = {
+  id: MEDICINE_ID,
+  name: 'Paracetamol',
+  strength: '500 mg',
+  unit: 'pc',
+  deletedAt: null as Date | null,
+};
 
 const prismaMock = prisma as unknown as {
   $transaction: jest.Mock;
   setting: { findUniqueOrThrow: jest.Mock };
+  medicine: { findUnique: jest.Mock };
+  medicineBatch: { findUnique: jest.Mock };
   inventoryTransaction: {
     findMany: jest.Mock;
     findUnique: jest.Mock;
@@ -58,16 +70,20 @@ const batchRow = {
   updatedAt: AT,
 };
 
-function transactionRow(data: {
-  direction: string;
-  reason: string;
-  quantity: number;
-  notes: string | null;
-  entries: { create: { batchId: string; quantity: number }[] };
-}) {
+function transactionRow(
+  data: {
+    direction: string;
+    reason: string;
+    quantity: number;
+    notes: string | null;
+    entries: { create: { batchId: string; quantity: number }[] };
+  },
+  medicine = MEDICINE,
+) {
   return {
     id: 'transaction-1',
     medicineId: MEDICINE_ID,
+    medicine,
     direction: data.direction,
     reason: data.reason,
     quantity: data.quantity,
@@ -158,6 +174,13 @@ describe('inventory data layer', () => {
       expect(result).toEqual({
         id: 'transaction-1',
         medicineId: MEDICINE_ID,
+        medicine: {
+          id: MEDICINE_ID,
+          name: 'Paracetamol',
+          strength: '500 mg',
+          unit: 'pc',
+          deleted: false,
+        },
         direction: 'OUT',
         reason: 'DISPENSED',
         quantity: 25,
@@ -474,6 +497,14 @@ describe('inventory data layer', () => {
       expect(args.take).toBe(20);
       expect(args.include.entries).toBeDefined();
       expect(args.include.performedBy).toBeDefined();
+      expect(args.include.medicine.select).toMatchObject({ name: true, deletedAt: true });
+      expect(result.items[0].medicine).toEqual({
+        id: MEDICINE_ID,
+        name: 'Paracetamol',
+        strength: '500 mg',
+        unit: 'pc',
+        deleted: false,
+      });
       expect(result.total).toBe(21);
       expect(result.page).toBe(2);
       expect(result.items[0].entries[0].expirationDate).toBe('2027-06-30');
@@ -508,12 +539,59 @@ describe('inventory data layer', () => {
       });
     });
 
+    it('marks a soft-deleted medicine as deleted and keeps its name', async () => {
+      prismaMock.inventoryTransaction.findUnique.mockResolvedValue(
+        transactionRow(
+          {
+            direction: 'OUT',
+            reason: 'LOST',
+            quantity: 1,
+            notes: null,
+            entries: { create: [{ batchId: BATCH_ID, quantity: 1 }] },
+          },
+          { ...MEDICINE, deletedAt: AT },
+        ),
+      );
+
+      const result = await getTransaction('transaction-1');
+
+      expect(result.medicine).toMatchObject({ name: 'Paracetamol', deleted: true });
+      expect(
+        prismaMock.inventoryTransaction.findUnique.mock.calls[0][0].include.medicine,
+      ).toBeDefined();
+    });
+
     it('returns 404 for a missing transaction', async () => {
       prismaMock.inventoryTransaction.findUnique.mockResolvedValue(null);
 
       const error = await rejection(getTransaction('missing'));
 
       expect(error.status).toBe(404);
+    });
+  });
+
+  describe('getTransactionFilterLabel', () => {
+    it('is null without a medicine or batch filter', async () => {
+      await expect(getTransactionFilterLabel(undefined, undefined)).resolves.toBeNull();
+      expect(prismaMock.medicine.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('names the medicine and the batch', async () => {
+      prismaMock.medicine.findUnique.mockResolvedValue({ name: 'Paracetamol', strength: '500 mg' });
+      prismaMock.medicineBatch.findUnique.mockResolvedValue({ batchNumber: 'P778' });
+
+      await expect(getTransactionFilterLabel(MEDICINE_ID, BATCH_ID)).resolves.toBe(
+        'Paracetamol 500 mg · Batch P778',
+      );
+      expect(prismaMock.medicine.findUnique.mock.calls[0][0].where).toEqual({ id: MEDICINE_ID });
+    });
+
+    it('still labels a filter whose record is missing', async () => {
+      prismaMock.medicine.findUnique.mockResolvedValue(null);
+
+      await expect(getTransactionFilterLabel(MEDICINE_ID, undefined)).resolves.toBe(
+        'Unknown medicine',
+      );
     });
   });
 });
