@@ -9,7 +9,8 @@ import {
   MenuTrigger,
 } from '@inventra-med/components';
 import { useState } from 'react';
-import { LuEllipsis, LuPencil, LuPrinter } from 'react-icons/lu';
+import NextLink from 'next/link';
+import { LuEllipsis, LuHistory, LuPencil, LuPrinter } from 'react-icons/lu';
 import { EditBatchDialog } from '@/components/medicines/EditBatchDialog';
 import { BatchMovementDialog } from '@/components/movements/BatchMovementDialog';
 import { getBatchActions, type MovementPermissions } from '@/lib/batch-stock';
@@ -25,6 +26,8 @@ interface BatchRowMenuProps {
   canEdit: boolean;
   /** Absent where the row is read-only, such as the `/scan` result. */
   movements?: BatchMovements;
+  /** The user has `inventory:read`, so the menu links to the batch's transactions. */
+  showHistory?: boolean;
 }
 
 const ACTION_LABELS: Record<BatchMovementAction, string> = {
@@ -36,7 +39,7 @@ const ACTION_LABELS: Record<BatchMovementAction, string> = {
   dispose: 'Dispose',
 };
 
-export function BatchRowMenu({ batch, canEdit, movements }: BatchRowMenuProps) {
+export function BatchRowMenu({ batch, canEdit, movements, showHistory }: BatchRowMenuProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [action, setAction] = useState<BatchMovementAction | null>(null);
   const actions = movements ? getBatchActions(batch, movements) : [];
@@ -66,6 +69,16 @@ export function BatchRowMenu({ batch, canEdit, movements }: BatchRowMenuProps) {
               Print label
             </a>
           </MenuItem>
+          {showHistory && (
+            <MenuItem value="history" asChild>
+              <NextLink
+                href={`/inventory/transactions?medicineId=${batch.medicineId}&batchId=${batch.id}`}
+              >
+                <LuHistory />
+                History
+              </NextLink>
+            </MenuItem>
+          )}
           {canEdit && (
             <MenuItem value="edit" onSelect={() => setEditOpen(true)}>
               <LuPencil />

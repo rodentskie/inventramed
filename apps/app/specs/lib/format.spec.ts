@@ -2,6 +2,7 @@ import {
   capitalize,
   formatCount,
   formatDaysToExpiry,
+  formatLocalDateTime,
   formatMedicineName,
   formatRelativeTime,
 } from '../../src/lib/format';
@@ -63,5 +64,14 @@ describe('capitalize', () => {
   it('capitalizes the first letter', () => {
     expect(capitalize('admin')).toBe('Admin');
     expect(capitalize('')).toBe('');
+  });
+});
+
+describe('formatLocalDateTime', () => {
+  it('shows the date and 24-hour time in the timezone', () => {
+    expect(formatLocalDateTime('2026-11-08T03:50:00.000Z', 'Asia/Manila')).toBe('2026-11-08 11:50');
+    expect(formatLocalDateTime(new Date('2026-11-07T16:30:00.000Z'), 'Asia/Manila')).toBe(
+      '2026-11-08 00:30',
+    );
   });
 });

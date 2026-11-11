@@ -264,8 +264,12 @@ describe('inventory routes', () => {
       });
     });
 
-    it('returns one transaction', async () => {
-      mocked.getTransaction.mockResolvedValue(transaction);
+    it('returns one transaction with its medicine', async () => {
+      const detail = {
+        id: 'transaction-1',
+        medicine: { id: ID, name: 'Paracetamol', strength: '500 mg', unit: 'pc', deleted: true },
+      } as never;
+      mocked.getTransaction.mockResolvedValue(detail);
 
       const response = await getTransactionRoute(
         new NextRequest(`${URL_BASE}/x`),
@@ -273,6 +277,7 @@ describe('inventory routes', () => {
       );
 
       expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ success: true, data: detail });
       expect(mocked.getTransaction).toHaveBeenCalledWith(ID);
     });
 

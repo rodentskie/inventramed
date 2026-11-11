@@ -126,6 +126,33 @@ describe('BatchTable', () => {
     );
   });
 
+  it.each([
+    [true, true],
+    [false, false],
+  ])('with showHistory=%s links to the batch history: %s', async (showHistory, shown) => {
+    const target = batches[1];
+    renderWithChakra(
+      <BatchTable
+        batches={[target]}
+        unit="pc"
+        canEdit={false}
+        timezone="Asia/Manila"
+        showHistory={showHistory}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for batch P778' }));
+
+    await screen.findByRole('menuitem', { name: 'Print label' });
+    const history = screen.queryByRole('menuitem', { name: 'History' });
+    expect(Boolean(history)).toBe(shown);
+    if (history) {
+      expect(history.getAttribute('href')).toBe(
+        `/inventory/transactions?medicineId=${target.medicineId}&batchId=b-2`,
+      );
+    }
+  });
+
   describe('batch movements', () => {
     const target = batch({ status: 'EXPIRED', daysToExpiry: -2, quantity: 20 });
 

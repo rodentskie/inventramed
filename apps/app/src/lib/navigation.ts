@@ -14,7 +14,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: 'Inventory',
     items: [
       { label: 'Medicines', href: '/medicines', icon: 'medicines', permissions: ['medicine:read'], enabled: true },
-      { label: 'Transactions', href: '/inventory/transactions', icon: 'transactions', permissions: ['inventory:read'], enabled: false },
+      { label: 'Transactions', href: '/inventory/transactions', icon: 'transactions', permissions: ['inventory:read'], enabled: true },
       { label: 'Scan', href: '/scan', icon: 'scan', permissions: ['medicine:read'], enabled: true },
     ],
   },
@@ -28,7 +28,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: 'System',
     items: [
       { label: 'Settings', href: '/settings', icon: 'settings', permissions: ['settings:manage'], enabled: true },
-      { label: 'Audit logs', href: '/audit-logs', icon: 'audit-logs', permissions: ['audit:read'], enabled: false },
+      { label: 'Audit logs', href: '/audit-logs', icon: 'audit-logs', permissions: ['audit:read'], enabled: true },
     ],
   },
 ];

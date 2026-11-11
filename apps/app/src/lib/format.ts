@@ -1,3 +1,4 @@
+import { getLocalTime, getLocalToday } from '@/lib/expiry';
 import type { InventoryReason } from '@/types/inventory';
 
 const SECOND = 1000;
@@ -14,6 +15,12 @@ export const REASON_LABELS: Record<InventoryReason, string> = {
   LOST: 'Lost',
   EXPIRED_DISPOSAL: 'Expired disposal',
 };
+
+/** `2026-11-08 11:50`, in the given IANA timezone. */
+export function formatLocalDateTime(date: string | Date, timezone: string): string {
+  const at = new Date(date);
+  return `${getLocalToday(timezone, at)} ${getLocalTime(timezone, at)}`;
+}
 
 /** Past times only, e.g. `just now`, `5 min ago`, `3 h ago`, `2 d ago`. */
 export function formatRelativeTime(date: string | Date, now: Date = new Date()): string {

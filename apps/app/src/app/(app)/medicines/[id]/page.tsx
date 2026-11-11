@@ -1,7 +1,9 @@
-import { Flex, HStack, Stack } from '@chakra-ui/react';
+import { Button, Flex, HStack, Stack } from '@chakra-ui/react';
 import type { Metadata } from 'next';
+import NextLink from 'next/link';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
+import { LuHistory } from 'react-icons/lu';
 import { SectionHeading } from '@/components/dashboard/SectionHeading';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { BatchTable } from '@/components/medicines/BatchTable';
@@ -59,6 +61,7 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
   const canWrite = hasPermission(user.permissions, 'medicine:write');
   const canMove = hasPermission(user.permissions, 'inventory:write');
   const canReceive = canWrite && canMove;
+  const canViewHistory = hasPermission(user.permissions, 'inventory:read');
   const { id, name, strength, unit } = medicine;
 
   return (
@@ -66,10 +69,22 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
       <PageHeader
         title={formatMedicineName(medicine.name, medicine.strength)}
         actions={
-          canWrite && (
+          (canViewHistory || canWrite) && (
             <>
-              <MedicineFormDialog medicine={medicine} />
-              <DeleteMedicineDialog medicine={medicine} />
+              {canViewHistory && (
+                <Button asChild size="sm" variant="outline">
+                  <NextLink href={`/inventory/transactions?medicineId=${medicine.id}`}>
+                    <LuHistory />
+                    History
+                  </NextLink>
+                </Button>
+              )}
+              {canWrite && (
+                <>
+                  <MedicineFormDialog medicine={medicine} />
+                  <DeleteMedicineDialog medicine={medicine} />
+                </>
+              )}
             </>
           )
         }
@@ -92,6 +107,7 @@ export default async function MedicinePage({ params }: MedicinePageProps) {
           canEdit={canWrite}
           timezone={context.timezone}
           movements={{ medicine: { id, name, strength, unit }, canMove, canReceive }}
+          showHistory={canViewHistory}
         />
       </Stack>
     </Stack>

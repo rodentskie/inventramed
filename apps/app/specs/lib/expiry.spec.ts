@@ -5,8 +5,50 @@ import {
   getExpiryStatus,
   getLocalTime,
   getLocalToday,
+  startOfLocalDay,
   toDateString,
 } from '../../src/lib/expiry';
+
+describe('startOfLocalDay', () => {
+  it('is 16:00 UTC the day before in Asia/Manila', () => {
+    expect(startOfLocalDay('2026-11-08', 'Asia/Manila').toISOString()).toBe(
+      '2026-11-07T16:00:00.000Z',
+    );
+  });
+
+  it('is UTC midnight in UTC', () => {
+    expect(startOfLocalDay('2026-11-08', 'UTC').toISOString()).toBe(
+      '2026-11-08T00:00:00.000Z',
+    );
+  });
+
+  it('uses the offset in force at midnight on the day daylight saving starts', () => {
+    // New York moves from -05:00 to -04:00 at 02:00 on 2026-03-08.
+    expect(startOfLocalDay('2026-03-08', 'America/New_York').toISOString()).toBe(
+      '2026-03-08T05:00:00.000Z',
+    );
+    expect(startOfLocalDay('2026-03-09', 'America/New_York').toISOString()).toBe(
+      '2026-03-09T04:00:00.000Z',
+    );
+  });
+
+  it('uses the offset in force at midnight on the day daylight saving ends', () => {
+    // New York moves from -04:00 to -05:00 at 02:00 on 2026-11-01.
+    expect(startOfLocalDay('2026-11-01', 'America/New_York').toISOString()).toBe(
+      '2026-11-01T04:00:00.000Z',
+    );
+    expect(startOfLocalDay('2026-11-02', 'America/New_York').toISOString()).toBe(
+      '2026-11-02T05:00:00.000Z',
+    );
+  });
+
+  it('starts at 01:00 where midnight is skipped', () => {
+    // Santiago moves from -04:00 to -03:00 at 00:00 on 2026-09-06.
+    const start = startOfLocalDay('2026-09-06', 'America/Santiago');
+    expect(start.toISOString()).toBe('2026-09-06T04:00:00.000Z');
+    expect(getLocalToday('America/Santiago', start)).toBe('2026-09-06');
+  });
+});
 
 describe('getExpiryStatus', () => {
   const today = '2026-11-05';
