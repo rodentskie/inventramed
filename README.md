@@ -92,6 +92,19 @@ Run these from the repository root.
 
 `compose.yml` doesn't define a named volume, so the next `docker compose up` after `down` starts with an empty database. If that happens, repeat the migrate and seed commands from step 4.
 
+### Docker image
+
+`apps/app/Dockerfile` is a multi-stage build: `target` installs dependencies, `build` builds the app, and `runner` runs the standalone Next.js server as a non-root user. The build context is the repository root, and `apps/app/Dockerfile.dockerignore` keeps local files out of it.
+
+```bash
+TASK=docker:build APP=app npm run task
+TASK=docker:run APP=app npm run task
+```
+
+The image contains no environment values or secrets. Every variable the app uses is read on the server at run time, so `docker:run` passes `apps/app/.env` with `--env-file`. One image works in every environment.
+
+`docker:run` joins the `inventramed` network from `compose.yml` and sets `DATABASE_URL` to the `pg` container, because `localhost` inside the container is the container itself. Start PostgreSQL first, and apply migrations from the host (`prisma:deploy` or `prisma:migrate`), because the image doesn't run them.
+
 ### Commands
 
 Run any of these as `TASK=<target> APP=app npm run task`.
@@ -112,6 +125,8 @@ Run any of these as `TASK=<target> APP=app npm run task`.
 | `prisma:validate`       | Validate `schema.prisma`                                   |
 | `prisma:format`         | Format `schema.prisma`                                     |
 | `prisma:studio`         | Open Prisma Studio to browse the data                      |
+| `docker:build`          | Build the `inventramed-app` Docker image                   |
+| `docker:run`            | Run the image on port 3000 with `apps/app/.env`            |
 
 Pass extra arguments after `--`. For example, to create a migration with a name:
 
