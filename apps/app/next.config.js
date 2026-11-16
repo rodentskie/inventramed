@@ -2,7 +2,8 @@
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
- experimental: {
+  output: 'standalone',
+  experimental: {
     optimizePackageImports: ["@chakra-ui/react"],
   },
 };

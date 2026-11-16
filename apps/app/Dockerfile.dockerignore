@@ -1,0 +1,43 @@
+# Build context is the repository root. Docker reads <Dockerfile>.dockerignore
+# next to the Dockerfile, so this file only applies to apps/app/Dockerfile.
+
+# Dependencies and build output (rebuilt inside the image)
+**/node_modules
+**/.next
+**/dist
+**/out-tsc
+**/.swc
+**/*.tsbuildinfo
+apps/app/src/generated
+
+# Env files hold secrets. They are passed at run time, never baked in.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Nx cache and workspace data
+.nx
+
+# Tests
+**/specs
+**/coverage
+**/test-output
+**/*.spec.ts
+**/*.spec.tsx
+**/*.test.ts
+**/*.test.tsx
+
+# Tooling, docs, editors
+.git
+.github
+.claude
+.vscode
+.idea
+.playwright-mcp
+context
+**/*.md
+**/Dockerfile
+**/*.dockerignore
+compose.yml
+npm-debug.log*
+.DS_Store

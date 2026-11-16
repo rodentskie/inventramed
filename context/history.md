@@ -124,3 +124,9 @@
   - Beyond the spec: a shared `useListFilters` hook, a `SignedQuantity` component and `formatLocalDateTime`. The batch audit label is the batch number alone, without the medicine name the mockup shows. The Transactions and Audit logs nav items are enabled, so no "Soon" items remain
   - No migration and no new dependencies
   - Checked with Playwright on the dev server as `admin`: a two-batch dispense, the medicine and batch History links, chip removal, a one-day range against the database count, a strength edit and a `<script>` value (on a test medicine, then restored). The chip's close button got an accessible label after this check. Not checked in the browser: a deleted medicine's transactions and the collaborator view
+- **Docker Image** `Nov. 17, 2026` - Multi-stage Docker image for `apps/app`.
+  - `apps/app/Dockerfile` on `node:24-alpine`: `target` runs `npm ci`, `build` runs `nx build app`, `runner` serves the standalone `server.js` as the non-root `node` user
+  - `output: 'standalone'` in `next.config.js`; `apps/app/Dockerfile.dockerignore` keeps `.env*`, `node_modules`, build output, tests and docs out of the root build context
+  - No env values are baked in. All variables are server-only and read at runtime, so `docker:run` passes `apps/app/.env` with `--env-file`. A placeholder `DATABASE_URL` is scoped to the build `RUN` only, because `src/lib/prisma.ts` throws on import without it
+  - Nx targets `docker:build` and `docker:run`. `docker:run` joins the compose `inventramed` network and points `DATABASE_URL` at `pg`. Migrations stay a separate host step
+  - Checked against the compose database: login page, static files, worker 401 without a token and 200 with one
