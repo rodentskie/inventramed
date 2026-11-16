@@ -94,8 +94,8 @@
       "docker:run": {
         "executor": "nx:run-commands",
         "options": {
-          "cwd": "{workspaceRoot}",
-          "command": "docker run --rm --name inventramed-app -p 3000:3000 --network inventramed --env-file apps/app/.env -e DATABASE_URL=postgresql://postgres:postgres@pg:5432/inventramed?schema=public inventramed-app:latest"
+          "cwd": "{projectRoot}",
+          "command": "docker run --rm --name inventramed-app -p 3000:3000 --network inventramed --env-file .env inventramed-app:latest"
         }
       },
       "build": {
