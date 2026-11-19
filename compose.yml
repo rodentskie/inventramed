@@ -14,6 +14,10 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rabbitmq
+    # The built-in guest user can only connect from localhost, so the Pi needs its own user.
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-inventramed}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-inventramed}
     networks:
       - inventramed
     ports:

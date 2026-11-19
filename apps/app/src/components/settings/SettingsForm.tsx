@@ -163,7 +163,7 @@ function SmsSection(props: SectionProps) {
           {...props}
           field="smsMaxItems"
           label="Items per SMS"
-          help="Fewer items keeps an SMS under 160 characters on modules without multipart support. Applies to digests made after the change."
+          help="The GSM module sends one 160-character SMS, and more than 1 item usually doesn't fit. A digest that doesn't fit fails to send. Applies to digests made after the change."
         />
       </SmsTemplateField>
     </Stack>

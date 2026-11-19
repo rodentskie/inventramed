@@ -46,10 +46,11 @@ func newModule(port string) (*Module, error) {
 	}, nil
 }
 
-// sendSMS sends an SMS. The pool sets status to busy before calling this.
-// This method updates status to idle or error after the attempt.
-func (m *Module) sendSMS(number, body string) error {
-	err := m.device.SendSMS(number, body)
+// sendSMS sends an SMS and returns the modem's "+CMGS:" line. The pool sets
+// status to busy before calling this. This method updates status to idle or
+// error after the attempt.
+func (m *Module) sendSMS(number, body string) (string, error) {
+	ref, err := m.device.SendSMS(number, body)
 
 	m.mu.Lock()
 	m.LastUsed = time.Now()
@@ -60,7 +61,7 @@ func (m *Module) sendSMS(number, body string) error {
 	}
 	m.mu.Unlock()
 
-	return err
+	return ref, err
 }
 
 func (m *Module) close() error {

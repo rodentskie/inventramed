@@ -2,152 +2,164 @@ package retry_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"apps/worker/internal/domain"
-	repository "apps/worker/internal/repository/message"
 	"apps/worker/internal/service/retry"
+	"libs/go/mq"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
-type mockRepo struct {
-	settings       *domain.Settings
-	settingsErr    error
-	failedMsgs     []domain.Message
-	failedMsgsErr  error
-	updatedStatus  map[string]string
-	updateErr      error
-	incrementedIDs []string
-	incrementErr   error
+type fakeClaimer struct {
+	claim  domain.Claim
+	err    error
+	called bool
 }
 
-func (m *mockRepo) GetSettings(_ context.Context) (*domain.Settings, error) {
-	return m.settings, m.settingsErr
+func (f *fakeClaimer) Claim(_ context.Context) (domain.Claim, error) {
+	f.called = true
+	return f.claim, f.err
 }
 
-func (m *mockRepo) GetFailedMessages(_ context.Context, _ int) ([]domain.Message, error) {
-	return m.failedMsgs, m.failedMsgsErr
+type published struct {
+	msg        domain.ClaimedMessage
+	expiration string
 }
 
-func (m *mockRepo) UpdateStatus(_ context.Context, id, status string) error {
-	if m.updatedStatus == nil {
-		m.updatedStatus = make(map[string]string)
+type fakePublisher struct {
+	consumers int
+	countErr  error
+	failIDs   map[string]bool
+	published []published
+}
+
+func (f *fakePublisher) Publish(_ context.Context, body []byte, opts ...mq.PublishOption) error {
+	var msg domain.ClaimedMessage
+	if err := json.Unmarshal(body, &msg); err != nil {
+		return err
 	}
-	m.updatedStatus[id] = status
-	return m.updateErr
+	if f.failIDs[msg.ID] {
+		return errors.New("channel closed")
+	}
+	var p amqp.Publishing
+	for _, opt := range opts {
+		opt(&p)
+	}
+	f.published = append(f.published, published{msg: msg, expiration: p.Expiration})
+	return nil
 }
 
-func (m *mockRepo) IncrementRetryCount(_ context.Context, id string) error {
-	m.incrementedIDs = append(m.incrementedIDs, id)
-	return m.incrementErr
+func (f *fakePublisher) ConsumerCount() (int, error) {
+	return f.consumers, f.countErr
 }
 
-type mockPublisher struct {
-	published [][]byte
-	err       error
+func messages(ids ...string) []domain.ClaimedMessage {
+	out := make([]domain.ClaimedMessage, len(ids))
+	for i, id := range ids {
+		out[i] = domain.ClaimedMessage{ID: id, PhoneNumber: "+639171234567", Body: "alert", Attempt: 1}
+	}
+	return out
 }
-
-func (m *mockPublisher) Publish(_ context.Context, body []byte) error {
-	m.published = append(m.published, body)
-	return m.err
-}
-
-var _ repository.MessageRepository = (*mockRepo)(nil)
-var _ retry.Publisher = (*mockPublisher)(nil)
 
 func TestRetryService_Run(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		settings      *domain.Settings
-		settingsErr   error
-		failedMsgs    []domain.Message
-		wantErr       bool
-		wantExhausted []string
-		wantRequeued  []string
+		name           string
+		consumers      int
+		countErr       error
+		claim          domain.Claim
+		claimErr       error
+		failIDs        map[string]bool
+		wantErr        bool
+		wantClaimed    bool
+		wantPublished  []string
+		wantExpiration string
+		wantInterval   time.Duration
 	}{
 		{
-			name:     "exhausts message at retry limit",
-			settings: &domain.Settings{RetryLimit: 3, RetryWindowDays: 5},
-			failedMsgs: []domain.Message{
-				{ID: "abc", To: "+1234", Body: "test", RetryCount: 3},
-			},
-			wantExhausted: []string{"abc"},
-			wantRequeued:  nil,
+			name:           "publishes each message with the ttl",
+			consumers:      1,
+			claim:          domain.Claim{PollIntervalSecs: 300, ClaimTimeoutSecs: 600, Messages: messages("a", "b")},
+			wantClaimed:    true,
+			wantPublished:  []string{"a", "b"},
+			wantExpiration: "540000",
+			wantInterval:   300 * time.Second,
 		},
 		{
-			name:     "requeues eligible message",
-			settings: &domain.Settings{RetryLimit: 3, RetryWindowDays: 5},
-			failedMsgs: []domain.Message{
-				{ID: "abc", To: "+1234", Body: "hello", RetryCount: 1},
-			},
-			wantExhausted: nil,
-			wantRequeued:  []string{"abc"},
+			name:           "uses the minimum ttl for a short claim timeout",
+			consumers:      1,
+			claim:          domain.Claim{PollIntervalSecs: 60, ClaimTimeoutSecs: 60, Messages: messages("a")},
+			wantClaimed:    true,
+			wantPublished:  []string{"a"},
+			wantExpiration: "30000",
+			wantInterval:   60 * time.Second,
 		},
 		{
-			name:     "exhausts at limit boundary (count equals limit)",
-			settings: &domain.Settings{RetryLimit: 3, RetryWindowDays: 5},
-			failedMsgs: []domain.Message{
-				{ID: "abc", To: "+1234", Body: "test", RetryCount: 3},
-				{ID: "def", To: "+5678", Body: "test", RetryCount: 2},
-			},
-			wantExhausted: []string{"abc"},
-			wantRequeued:  []string{"def"},
+			name:      "skips the claim with no consumers",
+			consumers: 0,
 		},
 		{
-			name:        "settings fetch error",
-			settingsErr: errors.New("db down"),
+			name:     "consumer count error",
+			countErr: errors.New("channel closed"),
+			wantErr:  true,
+		},
+		{
+			name:        "claim error",
+			consumers:   1,
+			claimErr:    errors.New("status 500"),
 			wantErr:     true,
+			wantClaimed: true,
 		},
 		{
-			name:          "no failed messages",
-			settings:      &domain.Settings{RetryLimit: 3, RetryWindowDays: 5},
-			failedMsgs:    []domain.Message{},
-			wantExhausted: nil,
-			wantRequeued:  nil,
+			name:           "one failed publish doesn't stop the rest",
+			consumers:      1,
+			claim:          domain.Claim{PollIntervalSecs: 300, ClaimTimeoutSecs: 600, Messages: messages("a", "b", "c")},
+			failIDs:        map[string]bool{"b": true},
+			wantClaimed:    true,
+			wantPublished:  []string{"a", "c"},
+			wantExpiration: "540000",
+			wantInterval:   300 * time.Second,
 		},
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			repo := &mockRepo{
-				settings:    tc.settings,
-				settingsErr: tc.settingsErr,
-				failedMsgs:  tc.failedMsgs,
-			}
-			pub := &mockPublisher{}
-			svc := retry.New(repo, pub, zap.NewNop())
+			claimer := &fakeClaimer{claim: tc.claim, err: tc.claimErr}
+			pub := &fakePublisher{consumers: tc.consumers, countErr: tc.countErr, failIDs: tc.failIDs}
+			svc := retry.New(claimer, pub, zap.NewNop())
 
-			err := svc.Run(context.Background())
+			interval, err := svc.Run(context.Background())
 
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Run() error = %v, wantErr %v", err, tc.wantErr)
 			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if claimer.called != tc.wantClaimed {
+				t.Errorf("claimed = %v, want %v", claimer.called, tc.wantClaimed)
 			}
-
-			for _, id := range tc.wantExhausted {
-				if repo.updatedStatus[id] != "exhausted" {
-					t.Errorf("message %q: expected status exhausted, got %q", id, repo.updatedStatus[id])
-				}
+			if interval != tc.wantInterval {
+				t.Errorf("interval = %v, want %v", interval, tc.wantInterval)
 			}
-
-			if len(repo.incrementedIDs) != len(tc.wantRequeued) {
-				t.Errorf("incremented %d IDs, want %d", len(repo.incrementedIDs), len(tc.wantRequeued))
-			}
-			if len(pub.published) != len(tc.wantRequeued) {
-				t.Errorf("published %d messages, want %d", len(pub.published), len(tc.wantRequeued))
-			}
+			assertPublished(t, pub.published, tc.wantPublished, tc.wantExpiration)
 		})
+	}
+}
+
+func assertPublished(t *testing.T, got []published, wantIDs []string, wantExpiration string) {
+	t.Helper()
+	if len(got) != len(wantIDs) {
+		t.Fatalf("published %d messages, want %d", len(got), len(wantIDs))
+	}
+	for i, p := range got {
+		if p.msg.ID != wantIDs[i] || p.expiration != wantExpiration {
+			t.Errorf("published[%d] = %+v, want id %q expiration %q", i, p, wantIDs[i], wantExpiration)
+		}
 	}
 }

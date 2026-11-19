@@ -14,6 +14,7 @@ import type {
 } from '@/types/sms';
 
 const MS_PER_MINUTE = 60_000;
+const SECS_PER_MINUTE = 60;
 
 interface ClaimedRow {
   id: string;
@@ -77,13 +78,16 @@ export async function claimSmsMessages(): Promise<SmsClaim> {
   await generateDailyNotification();
 
   const settings = await getSettings();
-  const pollIntervalSecs = settings.workerPollIntervalSecs;
+  const timing = {
+    pollIntervalSecs: settings.workerPollIntervalSecs,
+    claimTimeoutSecs: settings.smsClaimTimeoutMinutes * SECS_PER_MINUTE,
+  };
   if (!settings.smsEnabled) {
-    return { pollIntervalSecs, messages: [] };
+    return { ...timing, messages: [] };
   }
 
   await failExhaustedClaims(settings);
-  return { pollIntervalSecs, messages: await claimBatch(settings) };
+  return { ...timing, messages: await claimBatch(settings) };
 }
 
 function nextState(

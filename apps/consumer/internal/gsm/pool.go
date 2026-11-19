@@ -1,9 +1,14 @@
 package gsm
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 )
+
+// ErrNoIdleModule means every module is busy, erroring or offline, so the
+// message wasn't attempted.
+var ErrNoIdleModule = errors.New("no idle gsm modules available")
 
 // Pool manages a set of GSM modules with round-robin selection.
 type Pool struct {
@@ -33,11 +38,12 @@ func NewPool(ports []string) (*Pool, error) {
 	return &Pool{modules: modules, lastUsedIndex: -1}, nil
 }
 
-// Send routes an SMS to the next idle module using round-robin selection.
-func (p *Pool) Send(number, body string) error {
+// Send routes an SMS to the next idle module using round-robin selection and
+// returns the modem's "+CMGS:" line.
+func (p *Pool) Send(number, body string) (string, error) {
 	mod := p.nextIdle()
 	if mod == nil {
-		return fmt.Errorf("no idle gsm modules available")
+		return "", ErrNoIdleModule
 	}
 	return mod.sendSMS(number, body)
 }

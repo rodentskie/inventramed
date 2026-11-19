@@ -23,12 +23,12 @@ When a medicine becomes near expiry or expired, users are alerted through:
 
 ## Architecture
 
-- **Server** — hosts the InventraMed application: inventory management, barcode scanning, expiration checks, and in-app notifications.
-- **SMS worker (Raspberry Pi 3 Model B)** — a lightweight worker that fetches near-expiry and expired medicines from the server and sends SMS notifications through the USB GSM module.
+- **Server** — hosts the InventraMed application: inventory management, barcode scanning, expiration checks, and in-app notifications. It also runs RabbitMQ and the Go SMS worker, which claims queued SMS from the app and publishes them to RabbitMQ.
+- **SMS consumer (Raspberry Pi 3 Model B)** — a lightweight Go app on the same local network that takes each SMS from RabbitMQ, sends it through the USB GSM module, and publishes the result back.
 
 ## Hardware Components
 
-- Raspberry Pi 3 Model B — runs the SMS worker
+- Raspberry Pi 3 Model B — runs the SMS consumer
 - USB GSM module (with an active SIM card) — sends SMS notifications
 - Power supply for the Raspberry Pi
 - MicroSD card — holds the Raspberry Pi's operating system and worker
@@ -104,6 +104,78 @@ TASK=docker:run APP=app npm run task
 The image contains no environment values or secrets. Every variable the app uses is read on the server at run time, so `docker:run` passes `apps/app/.env` with `--env-file`. One image works in every environment.
 
 `docker:run` joins the `inventramed` network from `compose.yml` and sets `DATABASE_URL` to the `pg` container, because `localhost` inside the container is the container itself. Start PostgreSQL first, and apply migrations from the host (`prisma:deploy` or `prisma:migrate`), because the image doesn't run them.
+
+### SMS worker and consumer
+
+SMS goes from the app to the GSM module through RabbitMQ. All three processes are Go (1.27, `go.work` at the root):
+
+| Process          | Runs on | What it does                                                                  |
+| ---------------- | ------- | ----------------------------------------------------------------------------- |
+| `worker/retry`   | server  | Calls `POST /api/worker/sms/claim` and publishes each message to `sms.send`  |
+| `consumer`       | Pi      | Sends each `sms.send` message through the GSM module, publishes to `sms.success` |
+| `worker/success` | server  | Reports each `sms.success` result to `POST /api/worker/sms/:id/result`       |
+
+`docker compose up -d` also starts RabbitMQ (management UI on <http://localhost:15672>). Its user comes from `RABBITMQ_USER` and `RABBITMQ_PASSWORD`, which default to `inventramed`. Set your own in a root `.env` for anything other than local development. The built-in `guest` user only connects from localhost, so the Pi can't use it.
+
+The Go apps read plain environment variables and don't load `.env` files. Copy the examples and export them before running:
+
+```bash
+cp apps/worker/.env.example apps/worker/.env   # set WORKER_API_TOKEN to the app's value
+set -a; source apps/worker/.env; set +a
+TASK=dev.retry APP=worker npm run task
+TASK=dev.success APP=worker npm run task
+```
+
+| Variable               | App      | Purpose                                                               |
+| ---------------------- | -------- | --------------------------------------------------------------------- |
+| `APP_URL`              | worker   | Base URL of the Next.js app                                           |
+| `WORKER_API_TOKEN`     | worker   | Same value as in `apps/app/.env`                                      |
+| `RABBITMQ_URL`         | both     | `amqp://<user>:<password>@<host>:5672/`; the Pi uses the server's LAN IP |
+| `WORKER_POLL_INTERVAL` | worker   | Wait before the first claim and while no consumer is connected (`30s`). After that, the app's `worker_poll_interval_secs` is used. |
+| `GSM_PORTS`            | consumer | Comma-separated serial ports, e.g. `/dev/ttyUSB0`                    |
+
+The worker skips claiming while nothing consumes `sms.send`, so when the Pi is down, messages stay `PENDING` and the settings page shows the worker as offline.
+
+Each digest goes out as **one 160-character GSM-7 SMS**. Keep **Items per SMS** at 1 in settings; a longer body fails with a clear error instead of being cut off.
+
+#### Raspberry Pi
+
+Build the consumer for the Pi (32-bit DietPi; use `GOARCH=arm64` in `apps/consumer/project.json` for the 64-bit image) and copy it over:
+
+```bash
+TASK=rasp.build APP=consumer npm run task
+rsync -avz dist/consumer/ dietpi@<pi-ip>:/opt/inventramed/
+```
+
+On the Pi, give the user access to the serial port, then check the module shows up:
+
+```bash
+sudo usermod -aG dialout $USER   # takes effect after a reboot
+ls -la /dev/ttyUSB*
+```
+
+#### systemd
+
+Each process exits with status 1 when its RabbitMQ connection drops, so run them under systemd with a restart policy. For example, the consumer on the Pi (`/etc/systemd/system/inventramed-consumer.service`):
+
+```ini
+[Unit]
+Description=InventraMed SMS consumer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=dietpi
+EnvironmentFile=/opt/inventramed/consumer.env
+ExecStart=/opt/inventramed/consumer
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+The worker uses one unit per binary on the server: `TASK=build APP=worker npm run task` writes `apps/worker/dist/retry` and `apps/worker/dist/success`, each started the same way with the worker's env file.
 
 ### Commands
 

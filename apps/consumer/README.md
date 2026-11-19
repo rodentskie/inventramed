@@ -1,31 +1,10 @@
-### Setup
+# consumer
 
-Raspberry PI run using DietPI OS
+Runs on the Raspberry Pi (DietPi). It takes each message from the `sms.send` queue, sends it through the USB GSM module, and publishes the result to `sms.success`.
 
-Build for raspberry:
-
-```bash
-TASK=rasp.build APP=consumer pnpm nx-run
-```
-
-Copy to raspberry:
+See **SMS worker and consumer** in the root `README.md` for the environment, the Pi build, and the systemd unit.
 
 ```bash
-rsync -avz dist/consumer dietpi@<ip>:<dir>
-```
-
-**Note** replace the `ip` and `dir`
-
-
-```bash
-
-# add user to dialout group
-sudo usermod -aG dialout $USER
-
-# confirm user group after reboot
-groups $USER
-
-# list GSM serial ports
-ls -la /dev/ttyUSB*
-
+TASK=rasp.build APP=consumer npm run task
+rsync -avz dist/consumer/ dietpi@<pi-ip>:/opt/inventramed/
 ```
