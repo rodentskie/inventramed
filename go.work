@@ -1,0 +1,8 @@
+go 1.27
+
+use (
+	./apps/consumer
+	./apps/worker
+	./libs/go/gsm
+	./libs/go/mq
+)

@@ -3,10 +3,13 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
+    "add": "nx add $LIB",
     "dev": "nx dev $APP",
     "task": "nx $TASK $APP",
     "next:app": "nx g @nx/next:app apps/$APP",
-    "next:lib": "nx g @nx/next:lib libs/$APP"
+    "next:lib": "nx g @nx/next:lib libs/$APP",
+    "go:app": "nx g @nx-go/nx-go:application apps/$APP",
+    "go:lib": "nx g @nx-go/nx-go:library libs/go/$APP"
   },
   "private": true,
   "dependencies": {
@@ -34,6 +37,7 @@
     "@babel/preset-react": "^7.14.5",
     "@eslint/js": "^9.8.0",
     "@next/eslint-plugin-next": "^16.1.6",
+    "@nx-go/nx-go": "^4.1.1",
     "@nx/eslint": "24.0.2",
     "@nx/eslint-plugin": "24.0.2",
     "@nx/jest": "24.0.2",
