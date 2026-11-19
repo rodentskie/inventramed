@@ -8,18 +8,23 @@ import (
 	"syscall"
 	"time"
 
-	repository "apps/worker/internal/repository/message"
+	"apps/worker/internal/api"
 	retryservice "apps/worker/internal/service/retry"
 
 	"github.com/rodentskiedev/go-libraries/lib/env"
 	"github.com/rodentskiedev/go-libraries/lib/logger"
 	"go.uber.org/zap"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+)
+
+const (
+	HTTP_TIMEOUT    = 30 * time.Second
+	EXIT_OK         = 0
+	EXIT_CONN_ERROR = 1
 )
 
 type config struct {
-	DatabaseURL  string
+	AppURL       string
+	APIToken     string
 	RabbitMQURL  string
 	PollInterval time.Duration
 }
@@ -30,64 +35,87 @@ func loadConfig() config {
 		interval = 30 * time.Second
 	}
 	return config{
-		DatabaseURL:  env.GetEnv("DATABASE_URL", ""),
+		AppURL:       env.GetEnv("APP_URL", ""),
+		APIToken:     env.GetEnv("WORKER_API_TOKEN", ""),
 		RabbitMQURL:  env.GetEnv("RABBITMQ_URL", ""),
 		PollInterval: interval,
 	}
 }
 
 func main() {
+	os.Exit(run())
+}
+
+// run returns the exit code, so deferred cleanup runs before os.Exit.
+func run() int {
 	log := logger.New()
 	defer log.Sync() //nolint:errcheck
 
 	cfg := loadConfig()
-
-	if cfg.DatabaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
-	}
-	if cfg.RabbitMQURL == "" {
-		log.Fatal("RABBITMQ_URL is required")
-	}
-
-	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{})
-	if err != nil {
-		log.Fatal("failed to connect to database", zap.Error(err))
+	if cfg.AppURL == "" || cfg.APIToken == "" || cfg.RabbitMQURL == "" {
+		log.Fatal("APP_URL, WORKER_API_TOKEN and RABBITMQ_URL are required")
 	}
 
 	publisher, err := mq.NewPublisher(cfg.RabbitMQURL, mq.QueueName)
 	if err != nil {
 		log.Fatal("failed to connect to rabbitmq", zap.Error(err))
 	}
-	defer publisher.Close()
+	defer publisher.Close() //nolint:errcheck
 
-	repo := repository.New(db)
-	svc := retryservice.New(repo, publisher, log)
+	client := api.New(cfg.AppURL, cfg.APIToken, HTTP_TIMEOUT)
+	svc := retryservice.New(client, publisher, log)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ticker := time.NewTicker(cfg.PollInterval)
-	defer ticker.Stop()
-
-	log.Info("retry worker started", zap.Duration("poll_interval", cfg.PollInterval))
-
+	done := make(chan struct{})
 	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				if err := svc.Run(ctx); err != nil {
-					log.Error("retry run failed", zap.Error(err))
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
+		defer close(done)
+		poll(ctx, log, svc, cfg.PollInterval)
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	log.Info("retry worker started", zap.Duration("poll_interval", cfg.PollInterval))
+	code := waitForStop(log, publisher)
 
 	log.Info("retry worker stopping")
 	cancel()
+	<-done
+	return code
+}
+
+// poll runs immediately, then waits the interval from the last claim, or the
+// fallback when no claim was made.
+func poll(ctx context.Context, log *zap.Logger, svc retryservice.RetryService, fallback time.Duration) {
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+
+		next, err := svc.Run(ctx)
+		if err != nil {
+			log.Error("retry run failed", zap.Error(err))
+		}
+		if next <= 0 {
+			next = fallback
+		}
+		timer.Reset(next)
+	}
+}
+
+func waitForStop(log *zap.Logger, publisher *mq.Publisher) int {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case <-quit:
+		return EXIT_OK
+	case err := <-publisher.Closed():
+		log.Error("mq publisher connection closed", zap.Error(err))
+		return EXIT_CONN_ERROR
+	}
 }

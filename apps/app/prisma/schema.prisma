@@ -298,7 +298,7 @@ model Setting {
   smsRetryDelayMinutes    Int       @default(15) @map("sms_retry_delay_minutes")
   smsClaimTimeoutMinutes  Int       @default(10) @map("sms_claim_timeout_minutes")
   smsBatchSize            Int       @default(10) @map("sms_batch_size") // max messages per claim
-  smsMaxItems             Int       @default(10) @map("sms_max_items") // items listed before "+N more"
+  smsMaxItems             Int       @default(1) @map("sms_max_items") // items listed before "+N more"
   workerPollIntervalSecs  Int       @default(300) @map("worker_poll_interval_secs")
   smsTemplate             String    @default("{facility} expiry alert {date}: {expired} expired, {near_expiry} near expiry.\n{items}") @map("sms_template")
   workerLastSeenAt        DateTime? @map("worker_last_seen_at") @db.Timestamptz // updated on every worker call

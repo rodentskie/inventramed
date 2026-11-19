@@ -61,26 +61,28 @@ func (d *Device) Initialize() error {
 	return nil
 }
 
-// SendSMS sends an SMS to the given number using AT commands.
-func (d *Device) SendSMS(number, message string) error {
+// SendSMS sends an SMS to the given number using AT commands. It returns the
+// "+CMGS: <ref>" line the module sends back once the network accepts the message.
+func (d *Device) SendSMS(number, message string) (string, error) {
 	cmd := fmt.Sprintf(`AT+CMGS="%s"`, number)
 	if _, err := fmt.Fprintf(d.port, "%s\r", cmd); err != nil {
-		return fmt.Errorf("send cmgs: %w", err)
+		return "", fmt.Errorf("send cmgs: %w", err)
 	}
 
 	if err := d.waitForPrompt(); err != nil {
-		return fmt.Errorf("wait for prompt: %w", err)
+		return "", fmt.Errorf("wait for prompt: %w", err)
 	}
 
 	if _, err := fmt.Fprintf(d.port, "%s\x1A", message); err != nil {
-		return fmt.Errorf("send sms body: %w", err)
+		return "", fmt.Errorf("send sms body: %w", err)
 	}
 
-	if err := d.waitForResponse(smsTimeout, "+CMGS:", "OK", "ERROR"); err != nil {
-		return fmt.Errorf("sms confirmation: %w", err)
+	ref, err := d.waitForCMGS(smsTimeout)
+	if err != nil {
+		return "", fmt.Errorf("sms confirmation: %w", err)
 	}
 
-	return nil
+	return ref, nil
 }
 
 // Ping checks if the module is responsive.
@@ -161,10 +163,12 @@ func (d *Device) waitForPrompt() error {
 	return fmt.Errorf("timeout waiting for '>' prompt")
 }
 
-// waitForResponse reads until one of the terminal strings appears or timeout.
-func (d *Device) waitForResponse(timeout time.Duration, terminals ...string) error {
+// waitForCMGS reads until the final "OK" after "+CMGS:", or an error line.
+// It matches whole lines, so an echoed body containing "OK" or "ERROR" can't
+// end the wait early, and the trailing "OK" isn't left for the next command.
+func (d *Device) waitForCMGS(timeout time.Duration) (string, error) {
 	if err := d.port.SetReadTimeout(timeout); err != nil {
-		return fmt.Errorf("set timeout: %w", err)
+		return "", fmt.Errorf("set timeout: %w", err)
 	}
 
 	var sb strings.Builder
@@ -175,22 +179,39 @@ func (d *Device) waitForResponse(timeout time.Duration, terminals ...string) err
 		n, err := d.port.Read(buf)
 		if n > 0 {
 			sb.Write(buf[:n])
-			resp := sb.String()
-			if strings.Contains(resp, "ERROR") {
-				return fmt.Errorf("error response: %s", strings.TrimSpace(resp))
+			ref, done, failure := parseCMGS(sb.String())
+			if failure != "" {
+				return "", fmt.Errorf("error response: %s", failure)
 			}
-			for _, t := range terminals {
-				if strings.Contains(resp, t) {
-					return nil
-				}
+			if done {
+				return ref, nil
 			}
 		}
 		if err != nil && err != io.EOF {
-			return fmt.Errorf("read response: %w", err)
+			return "", fmt.Errorf("read response: %w", err)
 		}
 	}
 
-	return fmt.Errorf("response timeout after %s", timeout)
+	return "", fmt.Errorf("response timeout after %s", timeout)
+}
+
+// parseCMGS scans complete lines. It returns the "+CMGS:" line and done once an
+// "OK" line follows it, or the error line if the module reported one.
+func parseCMGS(resp string) (ref string, done bool, failure string) {
+	lines := strings.Split(resp, "\n")
+	// The last element is a partial line until its "\n" arrives.
+	for _, raw := range lines[:len(lines)-1] {
+		line := strings.TrimSpace(raw)
+		switch {
+		case line == "ERROR" || strings.HasPrefix(line, "+CMS ERROR") || strings.HasPrefix(line, "+CME ERROR"):
+			return "", false, line
+		case strings.HasPrefix(line, "+CMGS:"):
+			ref = line
+		case line == "OK" && ref != "":
+			return ref, true, ""
+		}
+	}
+	return "", false, ""
 }
 
 func (d *Device) readUntilOK(timeout time.Duration) (string, error) {

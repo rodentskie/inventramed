@@ -8,5 +8,6 @@ Read the following to get the full context of the project:
 - @context/current-feature.md
 - @context/coding-standards.md
 - @context/database-schema.md
+- @context/go-standards.md
 
 ---

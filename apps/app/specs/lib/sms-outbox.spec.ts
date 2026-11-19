@@ -96,13 +96,14 @@ describe('sms outbox', () => {
       expect(order).toEqual(['generate', 'fail', 'claim']);
     });
 
-    it('maps the claimed rows and returns the poll interval', async () => {
+    it('maps the claimed rows and returns the poll interval and claim timeout', async () => {
       mockedPrisma.$queryRaw.mockResolvedValue([
         { id: ID, phone_number: '+639171234567', body: 'Alert', attempts: 2 },
       ]);
 
       await expect(claimSmsMessages()).resolves.toEqual({
         pollIntervalSecs: 300,
+        claimTimeoutSecs: 600,
         messages: [
           { id: ID, phoneNumber: '+639171234567', body: 'Alert', attempt: 2 },
         ],
@@ -132,6 +133,7 @@ describe('sms outbox', () => {
 
       await expect(claimSmsMessages()).resolves.toEqual({
         pollIntervalSecs: 300,
+        claimTimeoutSecs: 600,
         messages: [],
       });
       expect(generateMock).toHaveBeenCalled();

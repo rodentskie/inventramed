@@ -50,30 +50,36 @@ The day thresholds between statuses are to be defined.
 
 - The web app notifies users when a medicine becomes near expiry or expired
 
-### D) SMS notifications (Raspberry Pi worker)
+### D) SMS notifications (worker, RabbitMQ and Raspberry Pi consumer)
 
-- A worker running on a **Raspberry Pi 3 Model B** fetches near-expiry and expired medicines from the server
-- The worker sends SMS alerts to registered mobile numbers through a **USB GSM module** (with an active SIM card)
-- The worker is only an SMS gateway — all inventory data and business logic live on the server
+- A **worker** on the server claims queued SMS from the app's worker API and publishes them to RabbitMQ
+- A **consumer** on a **Raspberry Pi 3 Model B** sends each one through a **USB GSM module** (with an active SIM card) and publishes the result back
+- The worker reports each result to the app. The Go apps are only an SMS gateway: all inventory data and business logic live in the Next.js app.
+- Each daily digest is sent as **one single-part SMS** (160 GSM-7 characters)
 
 ---
 
 ## Architecture
 
 ```
-┌──────────────────────────┐         ┌───────────────────────────────┐
-│ Server                   │         │ Raspberry Pi 3 Model B        │
-│  Next.js app (apps/app)  │◄────────│  SMS worker                   │
-│  - inventory + scanning  │  fetch  │  - polls for medicines to     │
-│  - expiration checks     │  alerts │    alert on                   │
-│  - in-app notifications  │         │  - sends SMS via USB GSM      │
-│  - API routes for worker │         │    module                     │
-│  PostgreSQL (Prisma)     │         └───────────────────────────────┘
-└──────────────────────────┘
+┌──────────────────────────── Server ─────────────────────────────┐
+│  Next.js app (apps/app)  ◄─HTTP─ worker/retry   ──► sms.send    │
+│  - inventory + scanning  ◄─HTTP─ worker/success ◄── sms.success │
+│  - expiration checks                                (RabbitMQ)  │
+│  - in-app notifications                                         │
+│  - worker API routes                                            │
+│  PostgreSQL (Prisma)                                            │
+└─────────────────────────────────────────────▲──────────┬────────┘
+                                      publish │          │ consume
+                            ┌─────────────────┴──────────▼──────┐
+                            │ Raspberry Pi 3 Model B            │
+                            │  consumer ──AT commands──► GSM    │
+                            └───────────────────────────────────┘
 ```
 
 - The Next.js app runs on a server and owns the database
-- The worker reaches the server through Next.js API routes (endpoints for non-browser clients)
+- The worker reaches the app through Next.js API routes (endpoints for non-browser clients), and never touches the database
+- The Pi and the server are on the same local network, so the Pi connects to RabbitMQ directly
 
 ---
 
@@ -90,6 +96,7 @@ The day thresholds between statuses are to be defined.
 | ORM            | Prisma (migrations via `prisma migrate`)          |
 | Testing        | Jest + Testing Library                            |
 | Monorepo       | Nx (`@nx/next`)                                   |
+| SMS gateway    | Go (worker, consumer) + RabbitMQ                  |
 | SMS hardware   | Raspberry Pi 3 Model B + USB GSM module           |
 
 ---
@@ -100,10 +107,13 @@ InventraMed is an Nx monorepo. Apps live under `apps/`.
 
 ```
 apps/
-└── app    # Next.js web app — inventory, barcode scanning, expiration checks, notifications, API routes
+├── app       # Next.js web app — inventory, barcode scanning, expiration checks, notifications, API routes
+├── worker    # Go, on the server — retry (claim → sms.send) and success (sms.success → result)
+└── consumer  # Go, on the Raspberry Pi — sms.send → GSM module → sms.success
+libs/go/
+├── mq        # RabbitMQ publisher and consumer
+└── gsm       # SIM800C AT commands and GSM-7 body checks
 ```
-
-The Raspberry Pi SMS worker will be added as a separate app when implemented.
 
 ---
 

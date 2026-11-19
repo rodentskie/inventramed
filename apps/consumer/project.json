@@ -3,5 +3,17 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/consumer",
+  "targets": {
+    "rasp.build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "commands": [
+          "GOOS=linux GOARCH=arm GOARM=7 go build -o ../../dist/consumer/consumer ."
+        ],
+        "parallel": false
+      }
+    }
+  },
   "tags": []
 }

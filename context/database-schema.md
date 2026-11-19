@@ -540,14 +540,20 @@ Worker API (Next.js route handlers, bearer token `WORKER_API_TOKEN` from env). B
     WHERE m.id = picked.id
    RETURNING m.id, m.phone_number, m.body, m.attempts;
    ```
-   The response is `{ pollIntervalSecs, messages: [{ id, phoneNumber, body, attempt }] }`, so the worker also learns `worker_poll_interval_secs`.
+   The response is `{ pollIntervalSecs, claimTimeoutSecs, messages: [{ id, phoneNumber, body, attempt }] }`, so the worker also learns `worker_poll_interval_secs`, and expires queued messages before the claim times out.
 2. **`POST /api/worker/sms/:id/result`** takes `{ attempt, success, error?, modemResponse? }`, where `attempt` is the value from the claim, and, in one transaction:
    - locks the message with `SELECT … FOR UPDATE`
    - ignores the result if the message isn't `SENDING` or `attempt` doesn't match `attempts`, returning `200` with `applied: false`, so a repeated or late result can't add a duplicate `sms_attempts` row or overwrite a newer claim
    - inserts an `sms_attempts` row
    - sets status to `SENT` + `sent_at`, or back to `PENDING` with a backoff, or to `FAILED` once `attempts >= sms_max_attempts`
 
-The worker reports each result **right after each send**, not in a batch, which keeps the window for duplicates small. Delivery is at-least-once: if the Pi dies after the modem sends but before it reports, the claim timeout requeues that message and it may go out twice. That is acceptable for alerts.
+The endpoints are called by `apps/worker` on the server, which moves messages through RabbitMQ to the Pi:
+
+- `worker/retry` claims, then publishes each message to the `sms.send` queue with a TTL of `max(claimTimeoutSecs − 60, 30)` seconds, so a copy can't still be queued when the claim times out and the message is claimed again. It skips the claim while `sms.send` has no consumer, so attempts aren't used up and `worker_last_seen_at` goes stale while the Pi is down.
+- `consumer` on the Pi sends one message at a time and publishes `{ id, attempt, success, error?, modemResponse? }` to `sms.success`. A body that isn't one GSM-7 SMS is reported as failed without reaching the modem. When no modem is available, the message is requeued instead of reported.
+- `worker/success` passes each result to `/result`. It drops a result that gets 400 or 404, and requeues it on any other error.
+
+The consumer reports each result **right after each send**, not in a batch, which keeps the window for duplicates small. Delivery is at-least-once: if the Pi dies after the modem sends but before it reports, the claim timeout requeues that message and it may go out twice. That is acceptable for alerts.
 
 Cancellation: when an employee turns off `receives_sms_alerts` or is deactivated, their `PENDING` messages are set to `CANCELLED`. A new day's digest also cancels older `PENDING` messages and older `SENDING` messages past their claim timeout (step 5 above).
 
@@ -684,4 +690,4 @@ CREATE TRIGGER medicines_audit AFTER INSERT OR UPDATE OR DELETE ON medicines
 
 ## Open questions
 
-- **Long SMS:** a digest with several items is longer than 160 characters. The worker must send it as a concatenated (multipart) SMS, which needs PDU mode on most GSM modules. If the module can't do that, lower `sms_max_items` so the digest fits in a single message.
+- ~~**Long SMS**~~ Decided in feature 18: the GSM module sends single-part text-mode SMS only, so `sms_max_items` defaults to 1, which fits about 135 characters with the default template. A body over 160 GSM-7 characters fails with a clear error.

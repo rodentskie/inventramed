@@ -9,6 +9,8 @@ export interface ClaimedSmsMessage {
 
 export interface SmsClaim {
   pollIntervalSecs: number;
+  /** The worker expires queued messages before this, so a re-claim can't leave a second copy. */
+  claimTimeoutSecs: number;
   messages: ClaimedSmsMessage[];
 }
 

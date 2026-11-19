@@ -65,6 +65,7 @@ describe('worker SMS routes', () => {
     it('returns the claim', async () => {
       const claim = {
         pollIntervalSecs: 300,
+        claimTimeoutSecs: 600,
         messages: [
           { id: ID, phoneNumber: '+639171234567', body: 'Alert', attempt: 1 },
         ],
