@@ -11,6 +11,15 @@ services:
     networks:
       - inventramed
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    networks:
+      - inventramed
+    ports:
+      - 5672:5672
+      - 15672:15672
+
 networks:
   inventramed:
     name: inventramed

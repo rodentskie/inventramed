@@ -1,0 +1,40 @@
+{
+  "name": "worker",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/worker",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "commands": [
+          "go build -o dist/retry ./cmd/retry/",
+          "go build -o dist/success ./cmd/success/"
+        ],
+        "parallel": false
+      }
+    },
+    "dev.retry": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "commands": [
+          "gow run cmd/retry/main.go"
+        ],
+        "parallel": false
+      }
+    },
+    "dev.success": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "{projectRoot}",
+        "commands": [
+          "gow run cmd/success/main.go"
+        ],
+        "parallel": false
+      }
+    }
+  },
+  "tags": []
+}
