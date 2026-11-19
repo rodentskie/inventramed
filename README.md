@@ -117,11 +117,10 @@ SMS goes from the app to the GSM module through RabbitMQ. All three processes ar
 
 `docker compose up -d` also starts RabbitMQ (management UI on <http://localhost:15672>). Its user comes from `RABBITMQ_USER` and `RABBITMQ_PASSWORD`, which default to `inventramed`. Set your own in a root `.env` for anything other than local development. The built-in `guest` user only connects from localhost, so the Pi can't use it.
 
-The consumer loads a `.env` file from its working directory if one exists (`cp apps/consumer/.env.example apps/consumer/.env`). Variables already set in the environment take precedence. The worker reads plain environment variables and doesn't load `.env` files, so copy its example and export it before running:
+The Go apps load a `.env` file from their working directory if one exists. Variables already set in the environment take precedence. The `dev.*` targets run from `apps/worker`, so copy the example there:
 
 ```bash
 cp apps/worker/.env.example apps/worker/.env   # set WORKER_API_TOKEN to the app's value
-set -a; source apps/worker/.env; set +a
 TASK=dev.retry APP=worker npm run task
 TASK=dev.success APP=worker npm run task
 ```
