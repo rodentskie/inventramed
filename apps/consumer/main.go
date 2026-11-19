@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"libs/go/mq"
 	"os"
 	"os/signal"
@@ -12,6 +14,7 @@ import (
 	internalgsm "apps/consumer/internal/gsm"
 	service "apps/consumer/internal/service/message"
 
+	"github.com/joho/godotenv"
 	"github.com/rodentskiedev/go-libraries/lib/env"
 	"github.com/rodentskiedev/go-libraries/lib/logger"
 	"go.uber.org/zap"
@@ -54,6 +57,11 @@ func main() {
 func run() int {
 	log := logger.New()
 	defer log.Sync() //nolint:errcheck
+
+	// Variables already set in the environment take precedence over .env.
+	if err := godotenv.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		log.Fatal("failed to load .env", zap.Error(err))
+	}
 
 	cfg := loadConfig()
 	if cfg.RabbitMQURL == "" {
