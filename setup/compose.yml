@@ -1,0 +1,121 @@
+# Local production stack: PostgreSQL, RabbitMQ, the app and the SMS worker.
+# Run from this directory, after copying .env.example to .env:
+#   docker compose up -d --build
+# The Raspberry Pi consumer is not part of this stack. It connects to
+# RabbitMQ on this host's LAN IP.
+
+name: inventramed-prod
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-worker: &worker
+  <<: *restart
+  image: inventramed-worker:latest
+  build:
+    context: ..
+    dockerfile: apps/worker/Dockerfile
+  environment:
+    APP_URL: http://app:3000
+    WORKER_API_TOKEN: ${WORKER_API_TOKEN:?set WORKER_API_TOKEN in setup/.env}
+    RABBITMQ_URL: amqp://${RABBITMQ_USER:-inventramed}:${RABBITMQ_PASSWORD:-inventramed}@rabbitmq:5672/
+    WORKER_POLL_INTERVAL: ${WORKER_POLL_INTERVAL:-30s}
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+    app:
+      condition: service_healthy
+
+services:
+  pg:
+    <<: *restart
+    image: postgres:16-alpine
+    container_name: inventramed-pg
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in setup/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-inventramed}
+    # Bind mount, not a named volume: the data stays in setup/data/pg when the
+    # container or Docker volumes are removed.
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+    # Host-only, for backups and Prisma Studio. The app uses the internal network.
+    ports:
+      - 127.0.0.1:${PG_PORT:-5432}:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    <<: *restart
+    image: rabbitmq:3-management-alpine
+    container_name: inventramed-rabbitmq
+    # The built-in guest user can only connect from localhost, so the Pi needs its own user.
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-inventramed}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-inventramed}
+    # 5672 is published on every interface so the Pi can reach it over the LAN.
+    ports:
+      - ${RABBITMQ_PORT:-5672}:5672
+      - ${RABBITMQ_UI_PORT:-15672}:15672
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # Applies migrations and seeds the system roles and admin user, then exits.
+  migrate:
+    image: inventramed-migrate:latest
+    container_name: inventramed-migrate
+    build:
+      context: ..
+      dockerfile: apps/app/Dockerfile
+      target: migrate
+    environment:
+      DATABASE_URL: &database-url postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@pg:5432/${POSTGRES_DB:-inventramed}?schema=public
+    depends_on:
+      pg:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    <<: *restart
+    image: inventramed-app:latest
+    container_name: inventramed-app
+    build:
+      context: ..
+      dockerfile: apps/app/Dockerfile
+      target: runner
+    environment:
+      DATABASE_URL: *database-url
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in setup/.env}
+      WORKER_API_TOKEN: ${WORKER_API_TOKEN:?set WORKER_API_TOKEN in setup/.env}
+      LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS:-5}
+      LOGIN_COOLDOWN_MINUTES: ${LOGIN_COOLDOWN_MINUTES:-15}
+    ports:
+      - ${APP_PORT:-3000}:3000
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/auth/providers"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      pg:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker-retry:
+    <<: *worker
+    container_name: inventramed-worker-retry
+    command: ["/usr/local/bin/retry"]
+
+  worker-success:
+    <<: *worker
+    container_name: inventramed-worker-success
+    command: ["/usr/local/bin/success"]

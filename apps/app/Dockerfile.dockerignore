@@ -18,6 +18,14 @@ apps/app/src/generated
 # Nx cache and workspace data
 .nx
 
+# Go workspace. @nx-go/nx-go runs `go` to build the project graph when it
+# finds these, and the Node image has no Go toolchain.
+go.work
+go.work.sum
+apps/worker
+apps/consumer
+libs/go
+
 # Tests
 **/specs
 **/coverage
@@ -39,5 +47,7 @@ context
 **/Dockerfile
 **/*.dockerignore
 compose.yml
+# Local production stack; data/pg is owned by the postgres user and unreadable
+setup
 npm-debug.log*
 .DS_Store

@@ -35,6 +35,14 @@ COPY . .
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build \
     npx nx build app --skip-nx-cache
 
+# ─── migrate: apply migrations and seed, then exit ──────────────────────
+# One-off job for setup/compose.yml. Reuses the build stage, which already
+# has the Prisma CLI, tsx and the generated client. The seed is safe to re-run.
+FROM build AS migrate
+WORKDIR /repo/apps/app
+
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed"]
+
 # ─── runner: run the standalone server ──────────────────────────────────
 FROM node:${NODE_VERSION} AS runner
 WORKDIR /app
