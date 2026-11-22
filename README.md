@@ -105,6 +105,39 @@ The image contains no environment values or secrets. Every variable the app uses
 
 `docker:run` joins the `inventramed` network from `compose.yml` and sets `DATABASE_URL` to the `pg` container, because `localhost` inside the container is the container itself. Start PostgreSQL first, and apply migrations from the host (`prisma:deploy` or `prisma:migrate`), because the image doesn't run them.
 
+### Local production stack
+
+`setup/compose.yml` runs the whole server side from images: PostgreSQL, RabbitMQ, the app, and both SMS workers. It is separate from the development `compose.yml` (its own project name, container names and network). It uses the same host ports by default, so stop the development stack first or change the ports in `setup/.env`.
+
+```bash
+cd setup
+cp .env.example .env   # set POSTGRES_PASSWORD, NEXTAUTH_SECRET and WORKER_API_TOKEN
+docker compose up -d --build
+```
+
+| Service          | What it does                                                                 |
+| ---------------- | ---------------------------------------------------------------------------- |
+| `pg`             | PostgreSQL. Published on `127.0.0.1` only, for backups and Prisma Studio     |
+| `rabbitmq`       | RabbitMQ. `5672` is published on every interface so the Pi can connect       |
+| `migrate`        | Runs `prisma migrate deploy` and the seed, then exits. Runs on every `up`, and both steps are safe to re-run |
+| `app`            | The Next.js app on <http://localhost:3000>. Starts after `migrate` succeeds  |
+| `worker-retry`   | `apps/worker` retry, built from `apps/worker/Dockerfile`                    |
+| `worker-success` | `apps/worker` success, same image                                           |
+
+The seed creates the `admin` user with the default password from `prisma/seed.ts`. Change it after the first login.
+
+PostgreSQL data is a bind mount at `setup/data/pg`, not a Docker volume, so it is kept after `docker compose down`, `docker compose down -v` and `docker volume prune`. The directory is git-ignored and owned by the container's `postgres` user, so removing it to start over needs `sudo rm -rf setup/data/pg`.
+
+Set `NEXTAUTH_URL` to the address people open in the browser, e.g. `http://<server-ip>:3000` for other machines on the LAN. The Pi's `RABBITMQ_URL` uses `RABBITMQ_USER` and `RABBITMQ_PASSWORD` from `setup/.env` and the server's LAN IP.
+
+| Command (from `setup/`)              | What it does                                       |
+| ------------------------------------ | -------------------------------------------------- |
+| `docker compose up -d --build`       | Build the images and start or update the stack     |
+| `docker compose ps -a`               | Show each service, including the `migrate` exit code |
+| `docker compose logs -f app`         | Follow a service's logs                            |
+| `docker compose down`                | Stop and remove the containers. Data is kept       |
+| `docker compose exec pg pg_dump -U postgres inventramed > backup.sql` | Back up the database |
+
 ### SMS worker and consumer
 
 SMS goes from the app to the GSM module through RabbitMQ. All three processes are Go (1.27, `go.work` at the root):

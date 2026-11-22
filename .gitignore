@@ -60,3 +60,6 @@ apps/app/src/generated
 
 # playwright
 .playwright-mcp/
+# Local production stack (setup/compose.yml): secrets and PostgreSQL data
+/setup/.env
+/setup/data

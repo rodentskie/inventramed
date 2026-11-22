@@ -1,0 +1,20 @@
+# Build context is the repository root. Docker reads <Dockerfile>.dockerignore
+# next to the Dockerfile, so this file only applies to apps/worker/Dockerfile.
+# Allow-list: only the Go workspace files the worker build needs.
+
+*
+!go.work
+!go.work.sum
+!apps/worker
+!apps/consumer/go.mod
+!apps/consumer/go.sum
+!libs/go
+
+# Env files hold secrets. They are passed at run time, never baked in.
+**/.env
+**/.env.*
+
+# Build output and tests
+**/dist
+**/*_test.go
+**/*.md
